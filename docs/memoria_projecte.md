@@ -238,8 +238,34 @@ d'ordre de magnitud.
 | 1 — Schema `sap_raw` | ✅ Escrit i desplegat (14 taules, buides) |
 | 2 — Worker .NET 8 | ✅ Compila amb 0 warnings, 23 tests verds |
 | 3 — Els 8 SPs repuntats | ✅ Escrits, **no desplegats encara** |
-| 4 — Validació contra `baseline` | ⏳ |
-| 5 — Tall i neteja | ⏳ |
+| 4 — Validació contra `baseline` | ✅ 25/08/2026: **7 de 8 taules idèntiques** |
+| 5 — Tall i neteja | ⏳ Falta revocar l'accés directe a `DB_FARINERA_TEST` |
+
+### Resultat de la Fase 4 (25/08/2026)
+
+Mirall omplert en **19 segons**, els 11 SPs desplegats, `sp_run_all @SkipSwap=1 @ForceFullLines=1`
+en 0,6 s amb 0 warnings, i `verify_migration.sql`:
+
+| Taula | Files diferents |
+|---|---|
+| est_agents · est_clients · est_productes · est_families_productes · est_atributs_client · est_atributs_producte · est_cobraments | **0** |
+| est_linies_albara | 124 (= les 62 línies, comptades en tots dos sentits) |
+
+Les 124 files difereixen **només** a `product_cost`: `product_price`, `discount` i `net_amount`
+quadren al cèntim. Les dues seccions bloquejants —`id_client_location` i `id_invoice_line` que
+apareixen o desapareixen— surten **buides**: el contracte amb Analitza es manté intacte.
+
+La causa és el forat B2 (§6.2): `Sync:CostField` val `StockInmPrice`, que a totes les línies és 0.
+
+**Bug trobat per aquesta validació, i és el motiu pel qual es fa.** A la primera passada
+`sp_load_invoice_lines` va carregar **0 línies** tenint-ne 57 al mirall. `SapEnums.LineType`
+traduïa una línia normal a NULL, i el filtre dels SPs és `LineType <> 'T'`: `NULL <> 'T'` no és
+cert sinó desconegut, així que descartava tot. A SAP una línia normal és cadena buida, no NULL.
+
+El greu no és el bug, és que **hauria passat desapercebut**: els checks de qualitat van donar 0
+crítics, perquè amb la taula buida no hi ha orfes i el check de volum anòmal tampoc salta.
+Corregit, amb test de regressió. Regla que se'n deriva: *un camp que s'utilitza dins d'un predicat
+no pot tenir NULL com a valor per defecte.*
 
 Els SPs nous no s'han desplegat deliberadament: amb el mirall buit deixarien el job en `BLOCKED`
 cada nit.

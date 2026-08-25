@@ -32,6 +32,13 @@ public sealed class SyncOptions
     public DateTime? BackfillFrom { get; set; }
 
     /// <summary>
+    /// El mode --backfill l'activa. Fa que <see cref="BackfillFrom"/> mani sobre
+    /// el cursor desat: sense això, un cop hi ha cursor no es podria rellegir
+    /// l'historic sense esborrar sap_raw.sync_state a ma.
+    /// </summary>
+    public bool ForceBackfill { get; set; }
+
+    /// <summary>
     /// Documents per lot abans d'escriure al mirall. Un lot massa gran manté
     /// molta memòria ocupada amb les línies expandides; massa petit multiplica
     /// els viatges a SQL Server.
@@ -54,5 +61,9 @@ public sealed class SyncOptions
     /// d'Analitza, i val mes buit que un valor que no es el que era.
     /// Ho decideix la Fase 0 amb xifres.
     /// </summary>
-    public string CostField { get; set; } = "StockInmPrice";
+    /// Per defecte "none": a 25/08/2026 sabem que cap candidat es el que era, i
+    /// deixar-ho buit a proposit es preferible a deixar-ho buit per casualitat
+    /// (StockInmPrice tambe dona 0, pero perque esta buit a SAP, no perque ho
+    /// haguem decidit). Ho ha de tancar l'Adria.
+    public string CostField { get; set; } = "none";
 }

@@ -208,7 +208,10 @@ internal static class MirrorTables
         Dec(SelectPrice(l, sync.PriceField)),
         Dec(SelectCost(l, sync.CostField)),
         Dec(l.DiscountPercent),
-        Val(SapEnums.LineType(l.LineType)));
+        // Sense Val(): la cadena buida ha d'arribar tal qual a la BD. Val()
+        // la convertiria en NULL i el filtre LineType <> 'T' tornaria a
+        // descartar-ho tot.
+        SapEnums.LineType(l.LineType));
 
     /// <summary>Quina propietat de SL fa de PriceBefDi. Ho fixa la Fase 0.</summary>
     public static double? SelectPrice(DocumentLineRow l, string field) => field switch

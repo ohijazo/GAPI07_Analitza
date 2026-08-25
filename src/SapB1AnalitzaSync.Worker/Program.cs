@@ -80,6 +80,7 @@ try
             }
             var sync = host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<SyncOptions>>().Value;
             sync.BackfillFrom = from;
+            sync.ForceBackfill = true;
             log.LogInformation("Backfill des de {From}", from.Value.ToString("yyyy-MM-dd"));
             await host.Services.GetRequiredService<MirrorSyncService>().RunOnceAsync(cts.Token);
             return 0;

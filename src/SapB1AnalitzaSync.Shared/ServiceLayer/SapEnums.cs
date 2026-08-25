@@ -49,15 +49,24 @@ public static class SapEnums
     };
 
     /// <summary>
-    /// BoDocLineType → DLN1.LineType. Només ens importa distingir les línies de
-    /// comentari ('T'), que els SPs filtren; la resta de tipus a SAP són cadena
-    /// buida, no una lletra.
+    /// BoDocLineType → DLN1.LineType. Els SPs filtren amb <c>LineType &lt;&gt; 'T'</c>.
+    ///
+    /// ATENCIÓ, aquí NO val la regla de "si no ho reconec, retorno null" que
+    /// segueix la resta d'aquest fitxer. A SAP una línia normal té cadena
+    /// buida, no NULL, i <c>NULL &lt;&gt; 'T'</c> no és cert sinó desconegut: si
+    /// retornéssim null, el filtre descartaria TOTES les línies i
+    /// est_linies_albara quedaria buida. I quedaria buida en silenci, perquè
+    /// amb la taula buida no hi ha orfes i el check de volum tampoc salta.
+    /// Va passar el 25/08/2026.
+    ///
+    /// Regla general: un camp que s'utilitza dins d'un predicat no pot tenir
+    /// NULL com a valor per defecte.
     /// </summary>
-    public static string? LineType(string? slValue) => slValue switch
+    public static string LineType(string? slValue) => slValue switch
     {
         "dlt_Comment" => "T",
         "dlt_Text"    => "T",
-        _             => null,
+        _             => "",   // línia normal: a SAP és cadena buida
     };
 
     /// <summary>

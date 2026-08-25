@@ -46,16 +46,31 @@ public class SapEnumsTests
     }
 
     /// <summary>
-    /// Els SPs filtren LineType &lt;&gt; 'T'. Només les línies de comentari són
-    /// 'T'; una línia normal ha de donar null i no una lletra qualsevol, o el
-    /// filtre deixaria passar comentaris o descartaria vendes.
+    /// REGRESSIO (25/08/2026). Els SPs filtren amb `LineType <> 'T'`. Si una
+    /// linia normal es tradueix a NULL, `NULL <> 'T'` no es cert sino
+    /// desconegut i el filtre descarta TOTES les linies: est_linies_albara
+    /// queda buida, i queda buida en silenci perque amb la taula buida no hi
+    /// ha orfes i el check de volum tampoc salta.
+    ///
+    /// Una linia normal a SAP es cadena buida, no NULL.
     /// </summary>
+    [Theory]
+    [InlineData("dlt_Regular")]
+    [InlineData("qualsevol_altra_cosa")]
+    [InlineData(null)]
+    [InlineData("")]
+    public void LineType_duna_linia_normal_es_cadena_buida_i_mai_null(string? sl)
+    {
+        var result = SapEnums.LineType(sl);
+        Assert.NotNull(result);
+        Assert.Equal("", result);
+    }
+
     [Fact]
-    public void LineType_nomes_marca_els_comentaris()
+    public void LineType_marca_els_comentaris_amb_T()
     {
         Assert.Equal("T", SapEnums.LineType("dlt_Comment"));
-        Assert.Null(SapEnums.LineType("dlt_Regular"));
-        Assert.Null(SapEnums.LineType(null));
+        Assert.Equal("T", SapEnums.LineType("dlt_Text"));
     }
 
     [Theory]

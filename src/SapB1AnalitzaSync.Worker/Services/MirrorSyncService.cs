@@ -153,6 +153,10 @@ internal sealed class MirrorSyncService
     /// </summary>
     private async Task<DateTime?> ResolveSinceAsync(string entity, CancellationToken ct)
     {
+        // --backfill ha de manar sobre el cursor. Si no, un cop hi ha cursor no
+        // hi hauria manera de rellegir l'historic sense esborrar sync_state a ma.
+        if (_sync.ForceBackfill) return _sync.BackfillFrom;
+
         var cursor = await _state.GetCursorAsync(entity, ct).ConfigureAwait(false);
         if (cursor is null) return _sync.BackfillFrom;
         return cursor.Value.Date.AddDays(-_sync.OverlapDays);
