@@ -1,0 +1,35 @@
+# Build output
+bin/
+obj/
+
+# .NET user-secrets: els secrets viuen a %APPDATA%\Microsoft\UserSecrets, no al repo.
+# Aquesta línia és una xarxa de seguretat per si algun cop en cau un a dins.
+**/secrets.json
+
+# Configuració local de Claude Code (per projecte)
+.claude/settings.local.json
+
+# Logs locals del Worker
+logs/
+**/logs/
+
+# Fitxers temporals de proves manuals contra Service Layer (cookies de sessió, respostes de login)
+**/.sl_cookies
+**/.sl_login_response.json
+
+# Sortides de la sonda de Fase 0: poden contenir dades reals de clients
+tools/spike/out/
+
+# Credencials i connexions
+*.env
+.env
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+~$*.docx

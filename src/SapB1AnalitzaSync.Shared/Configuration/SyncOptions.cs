@@ -1,0 +1,58 @@
+namespace SapB1AnalitzaSync.Shared.Configuration;
+
+public sealed class DatabaseOptions
+{
+    public const string SectionName = "Database";
+
+    /// <summary>Connexió a IntercanviSAP amb permís d'escriptura sobre sap_raw.</summary>
+    public string ConnectionString { get; set; } = string.Empty;
+
+    public int CommandTimeoutSeconds { get; set; } = 300;
+
+    /// <summary>Files per lot de SqlBulkCopy cap a la taula temporal.</summary>
+    public int BulkBatchSize { get; set; } = 5000;
+}
+
+public sealed class SyncOptions
+{
+    public const string SectionName = "Sync";
+
+    /// <summary>
+    /// Dies que es resta al cursor abans de demanar a SL. Compensa que el
+    /// filtre incremental només pot ser per UpdateDate i no per UpdateTime
+    /// (Regla 02): un document actualitzat el mateix dia que el cursor es
+    /// tornaria a llegir. El MERGE és idempotent, així que rellegir no fa mal.
+    /// </summary>
+    public int OverlapDays { get; set; } = 1;
+
+    /// <summary>
+    /// Data des de la qual es fa el backfill inicial de documents quan no hi ha
+    /// cursor. Null = tot l'històric.
+    /// </summary>
+    public DateTime? BackfillFrom { get; set; }
+
+    /// <summary>
+    /// Documents per lot abans d'escriure al mirall. Un lot massa gran manté
+    /// molta memòria ocupada amb les línies expandides; massa petit multiplica
+    /// els viatges a SQL Server.
+    /// </summary>
+    public int DocumentFlushSize { get; set; } = 500;
+
+    /// <summary>
+    /// Propietat de Service Layer que alimenta DLN1.PriceBefDi (preu unitari
+    /// ABANS de descompte). Valors: "UnitPrice" (per defecte) o "Price".
+    /// Es configurable perque la Fase 0 ho ha de confirmar contra baseline: si
+    /// s'inverteix, el net_amount surt malament i cap check de qualitat ho
+    /// detecta, perque queda coherent amb ell mateix (Regla 04).
+    /// </summary>
+    public string PriceField { get; set; } = "UnitPrice";
+
+    /// <summary>
+    /// Propietat que alimenta DLN1.StockPrice (cost de la linia). Service Layer
+    /// no exposa StockPrice; els candidats son "StockInmPrice" i "GrossBuyPrice".
+    /// "none" deixa el cost a NULL: product_cost es opcional a la guia
+    /// d'Analitza, i val mes buit que un valor que no es el que era.
+    /// Ho decideix la Fase 0 amb xifres.
+    /// </summary>
+    public string CostField { get; set; } = "StockInmPrice";
+}
