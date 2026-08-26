@@ -205,6 +205,63 @@ BEGIN
                         'Han desaparegut ' + CAST(@cnt AS varchar(20)) + ' identificadors respecte d ahir: ' + @vanished_detail);
         END
 
+        /* ----- 9) Terra minim de files a les taules de moviment -----
+
+           El 25/08/2026 sp_load_invoice_lines va carregar 0 linies tenint-ne 57
+           al mirall, i els vuit checks anteriors van donar 0 critics: amb la
+           taula buida no hi ha orfes, la formula no es pot trencar, els signes
+           quadren, i el check de volum calcula la mitjana sobre la MATEIXA
+           taula buida, treu NULL i se salta tot sol. El swap hauria publicat la
+           taula buida i Analitza s'hauria quedat sense albarans.
+
+           El check 8 (vanished_ids) no ho cobreix: mira clients, productes,
+           families i comercials, que son mestres, no moviments.
+
+           Les linies d'albara son historic acumulat: el recompte no ha de
+           baixar mai de manera significativa. Els cobraments si que fluctuen
+           (una factura es cobra i desapareix), aixi que d'aquells nomes es
+           vigila que no quedin a zero de cop.
+
+           dbo.* te la foto d'ahir. Si esta buida, es la primera carrega i no hi
+           ha res a comparar. -----*/
+        DECLARE @min_ratio decimal(5,3);
+        SELECT @min_ratio = TRY_CAST([value] AS decimal(5,3)) FROM cfg.settings WHERE [key] = 'LINES_MIN_RATIO';
+        SET @min_ratio = ISNULL(@min_ratio, 0.95);
+
+        DECLARE @lines_before bigint, @lines_now bigint, @recv_before bigint, @recv_now bigint;
+        SELECT @lines_before = COUNT_BIG(*) FROM dbo.est_linies_albara;
+        SELECT @lines_now    = COUNT_BIG(*) FROM staging.est_linies_albara;
+        SELECT @recv_before  = COUNT_BIG(*) FROM dbo.est_cobraments;
+        SELECT @recv_now     = COUNT_BIG(*) FROM staging.est_cobraments;
+
+        IF @lines_before > 0 AND @lines_now = 0
+        BEGIN
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'lines_empty', 'CRITICAL',
+                    'staging.est_linies_albara ha quedat BUIDA i ahir tenia '
+                    + CAST(@lines_before AS varchar(20)) + ' files. Swap avortat.');
+            SET @CriticalCount = @CriticalCount + 1;
+        END
+        ELSE IF @lines_before > 0 AND @lines_now < CAST(@lines_before * @min_ratio AS bigint)
+        BEGIN
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'lines_collapsed', 'CRITICAL',
+                    'staging.est_linies_albara ha passat de ' + CAST(@lines_before AS varchar(20))
+                    + ' a ' + CAST(@lines_now AS varchar(20)) + ' files, per sota del '
+                    + CAST(CAST(@min_ratio * 100 AS int) AS varchar(10)) + '% d ahir. '
+                    + 'Les linies son historic acumulat i no haurien de minvar. Swap avortat.');
+            SET @CriticalCount = @CriticalCount + 1;
+        END
+
+        IF @recv_before > 0 AND @recv_now = 0
+        BEGIN
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'receivables_empty', 'CRITICAL',
+                    'staging.est_cobraments ha quedat BUIDA i ahir tenia '
+                    + CAST(@recv_before AS varchar(20)) + ' files. Swap avortat.');
+            SET @CriticalCount = @CriticalCount + 1;
+        END
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),

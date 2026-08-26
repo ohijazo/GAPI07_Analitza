@@ -16,12 +16,26 @@ public class SapEnumsTests
     public void YesNo_tradueix_els_valors_coneguts(string sl, string expected) =>
         Assert.Equal(expected, SapEnums.YesNo(sl));
 
+    /// <summary>
+    /// REGRESSIO (26/08/2026). validFor s'utilitza dins d'un predicat
+    /// (`CASE WHEN validFor = 'Y'`). Si es tradueix a NULL, la comparacio es
+    /// falsa per a TOTS els registres i tots els clients i productes queden
+    /// inactius a la taula que llegeix Analitza — i en silenci, perque els
+    /// identificadors hi son tots i cap check mira l'active.
+    ///
+    /// Aqui no hi ha valor per defecte honest, aixi que s'atura la
+    /// sincronitzacio: val mes quedar-se amb les dades d'ahir.
+    /// </summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("tYes")]     // SL no escriu això, però si ho fes no volem endevinar
-    public void YesNo_retorna_null_si_no_el_reconeix(string? sl) =>
-        Assert.Null(SapEnums.YesNo(sl));
+    [InlineData("true")]
+    public void YesNo_peta_si_no_el_reconeix(string? sl)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => SapEnums.YesNo(sl));
+        Assert.Contains("no reconegut", ex.Message);
+    }
 
     [Fact]
     public void CardType_de_client_es_C()

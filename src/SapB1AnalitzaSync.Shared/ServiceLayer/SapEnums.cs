@@ -13,12 +13,34 @@ namespace SapB1AnalitzaSync.Shared.ServiceLayer;
 /// </summary>
 public static class SapEnums
 {
-    /// <summary>BoYesNoEnum ("tYES"/"tNO") → 'Y'/'N', com validFor i frozenFor.</summary>
-    public static string? YesNo(string? slValue) => slValue switch
+    /// <summary>
+    /// BoYesNoEnum ("tYES"/"tNO") → 'Y'/'N', com validFor i frozenFor.
+    ///
+    /// PETA si rep qualsevol altra cosa, i ho fa a propòsit. Aquest valor
+    /// s'utilitza dins d'un predicat: <c>CASE WHEN validFor = 'Y' ...</c> a
+    /// sp_load_clients i sp_load_products. Si retornéssim null, la comparació
+    /// seria falsa per a TOTS els registres i **tots els clients i tots els
+    /// productes quedarien inactius** a la taula que llegeix Analitza.
+    ///
+    /// I quedarien inactius en silenci: els identificadors hi serien tots, o
+    /// sigui que el check vanished_ids no salta, i cap altre check mira
+    /// l'`active`. És la mateixa lliçó que el <see cref="LineType"/>, però aquí
+    /// no hi ha cap valor per defecte honest: no sabem si el registre és vàlid.
+    ///
+    /// Preferim aturar la sincronització. El pas 1 del job surt amb error, el
+    /// pas 2 no s'executa i dbo.est_* es queda amb les dades d'ahir.
+    ///
+    /// A la pràctica no hauria de saltar mai: BoYesNoEnum només té dos valors.
+    /// Si salta, vol dir que Service Layer ha canviat de forma i volem saber-ho.
+    /// </summary>
+    public static string YesNo(string? slValue) => slValue switch
     {
         "tYES" => "Y",
         "tNO"  => "N",
-        _      => null,
+        _      => throw new InvalidOperationException(
+                      $"Valor de BoYesNoEnum no reconegut: '{slValue ?? "(null)"}'. " +
+                      "S'atura la sincronitzacio: continuar deixaria tots els registres " +
+                      "com a inactius a est_clients i est_productes."),
     };
 
     /// <summary>BoCardTypes → OCRD.CardType.</summary>

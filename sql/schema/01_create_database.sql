@@ -393,6 +393,10 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'INCREMENTAL_WINDOW_DAYS
     INSERT cfg.settings ([key], [value], description)
     VALUES ('INCREMENTAL_WINDOW_DAYS', '7', 'Finestra (dies) que re-extreu sp_load_invoice_lines en mode incremental.');
 
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'LINES_MIN_RATIO')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('LINES_MIN_RATIO', '0.95', 'Proporcio minima de files que ha de tenir staging.est_linies_albara respecte de dbo abans que el check lines_collapsed aturi el swap. Les linies son historic acumulat i no haurien de minvar. Abaixar-lo expressament nomes si hi ha un canvi previst (p.ex. el cutover, quan SAP productiva arrenca sense historic).');
+
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ID_DROP_MAX')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('ID_DROP_MAX', '10', 'Identificadors que poden desapareixer d un dia per l altre abans que el check vanished_ids passi de WARN a CRITICAL i aturi el swap. Apujar-lo expressament nomes si hi ha un canvi massiu previst (p.ex. el cutover).');

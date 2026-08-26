@@ -628,11 +628,34 @@ SELECT step_name, status, rows_in, rows_out, duration_ms, LEFT(error_message,200
 FROM IntercanviSAP.audit.etl_step_log
 WHERE run_id = (SELECT MAX(run_id) FROM IntercanviSAP.audit.etl_runs) ORDER BY step_id;
 
--- Warnings de qualitat (8 checks)
+-- Warnings de qualitat (9 checks)
 SELECT severity, check_name, details FROM IntercanviSAP.audit.data_quality_warnings
 WHERE run_id = (SELECT MAX(run_id) FROM IntercanviSAP.audit.etl_runs);
 ```
 
+
+### El terra mínim de files (afegit 26/08/2026)
+
+El 25/08 `sp_load_invoice_lines` va carregar 0 línies tenint-ne 57 al mirall, i **els vuit checks
+van donar 0 crítics**: amb la taula buida no hi ha orfes, la fórmula no es pot trencar, els signes
+quadren, i el check de volum calcula la mitjana sobre la mateixa taula buida, treu NULL i se salta
+tot sol. El swap hauria publicat la taula buida.
+
+Aleshores es va corregir el `LineType`, que n'era **una** causa. El forat seguia obert: qualsevol
+altra cosa que buidés les línies hauria passat igual. I `vanished_ids` no ho cobreix, perquè mira
+mestres, no moviments.
+
+- `lines_empty` — CRITICAL si `staging.est_linies_albara` queda buida i ahir no ho estava.
+- `lines_collapsed` — CRITICAL si baixa per sota de `cfg.settings.LINES_MIN_RATIO` (0.95 per
+  defecte) respecte d'ahir. Les línies són històric acumulat: el recompte no hauria de minvar.
+- `receivables_empty` — CRITICAL si `est_cobraments` queda buida. Aquí només es vigila el zero,
+  perquè els cobraments sí que fluctuen: una factura es cobra i desapareix.
+
+**Al cutover caldrà abaixar `LINES_MIN_RATIO`**: la SAP productiva arrenca sense històric
+d'albarans, així que el recompte caurà a propòsit.
+
+Provat el 26/08 als quatre casos: dades correctes no salta; taula buida dona `lines_empty`; 52 de
+62 files (84%) dona `lines_collapsed`; i restaurat torna a estar net.
 
 ### El check `vanished_ids` (afegit 26/08/2026)
 
