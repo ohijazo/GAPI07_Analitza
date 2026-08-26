@@ -151,6 +151,11 @@ mantenir el codi antic viu, sinó una **fotografia congelada** de la seva sortid
 **Conseqüència operativa:** el cutover a productiva ja no és un `UPDATE cfg.settings`. Ara és
 canviar `ServiceLayer:CompanyDb` a la configuració del Worker.
 
+`cfg.settings.SBO_DB` es va esborrar de la base de dades viva el 26/08/2026. Fins llavors hi seguia
+—el script de schema no s'executa mai perquè fa `DROP TABLE dbo.est_*`— i era un parany: el dia del
+cutover algú l'hauria vist amb `DB_FARINERA_TEST`, l'hauria canviat a `DB_FARINERA_PROD` pensant que
+era l'interruptor, i no hauria passat res.
+
 ### 3.3 Validar contra `baseline`, no contra SAP
 
 La fidelitat del mirall **no** es demostra comparant `sap_raw` contra les taules de SAP —això
@@ -569,8 +574,22 @@ desajust: `etl_runs.started_at` guarda **UTC** i a l'agost anem a UTC+2.
 Fases 0 a 4 tancades (§5, §6). Queda:
 
 - **Configurar el Worker per al compte de SQL Agent**, o el job seguirà fallant cada nit (§5).
-- **Fase 5**: executar `sql/security/revoke_sap_direct_access.sql`. Fins que no es faci, la
-  prohibició de llegir taules internes de SAP és només documental: tècnicament encara es pot.
+- **Fase 5 — no es pot fer tal com estava plantejada.** Comprovat el 26/08/2026: els usuaris de
+  `DB_FARINERA_TEST` són tots de SAP (`B1_*`, `SAPB1_*`, `LOG_*`), més `analitza_ro` —que ja té
+  `DENY CONNECT`— i `NT AUTHORITY\SYSTEM`. **`sa` no hi surt com a usuari** perquè és sysadmin, i a
+  un sysadmin no se li pot denegar res.
+
+  O sigui que "revocar l'accés" no és una qüestió de permisos sinó de **sota quin compte corre
+  l'ETL**. Ara mateix: cap procediment fa referència a SAP —el codi ja no pot— però el compte sí que
+  podria. La feina real és:
+
+  1. El Worker amb `gapi07_worker` (`sql/security/create_worker_user.sql`), no amb `sa`.
+  2. El job de SQL Agent corrent sota un compte que no sigui sysadmin, amb permisos només sobre
+     `IntercanviSAP`.
+
+  Fins que això no es faci, la Regla 01 és una convenció d'equip, no una barrera tècnica.
+  `sql/security/revoke_sap_direct_access.sql` ja ho advertia a la secció 2; ara està confirmat amb
+  dades.
 - Resoldre l'única diferència que queda contra `baseline`: `product_cost` (§6.2).
 
 ### Del projecte, anteriors a la migració
