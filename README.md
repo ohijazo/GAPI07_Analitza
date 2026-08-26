@@ -155,9 +155,18 @@ P:\GAPI07_Analitza\
 
 ### 🔄 Pendent (per fases)
 
-**Bloc A — Sistemes (infraestructura)** *(correu llest a `draft_resposta_sistemes.md`)*
+**Bloc A — Sistemes (infraestructura)**
+- [ ] **Desplegar el Worker a `AE01SAPRDP`** — petició llesta a `peticio_sistemes_worker.docx`.
+      Cal compte de servei, carpeta amb permisos tancats i tasca programada a les 02:45.
+      Sense això el job de les 03:00 avorta amb `ABORTED_STALE_MIRROR`
 - [ ] Rebre resposta sobre el compte SMTP per a Database Mail
 - [ ] Passar-los la IP d'Analitza perquè obrin el firewall al port 1433, quan l'Adrià la doni
+
+**Bloc A bis — Usuaris dedicats** *(feina meva, no de Sistemes)*
+- [ ] Usuari tècnic de SAP de només lectura per a Service Layer (ara va amb `OHijazo`)
+- [ ] Login `gapi07_worker` a SQL Server (ara va amb `sa`) — script a
+      `sql/security/create_worker_user.sql`
+- [ ] Rotar la contrasenya de `sa` i la d'`analitza_ro`
 
 **Bloc B — Handoff Analitza** *(correu llest a `correu_adria.md`)*
 - [ ] Rotar contrasenya de `analitza_ro` (ara és placeholder desconegut)
