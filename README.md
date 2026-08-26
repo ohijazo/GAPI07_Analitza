@@ -114,7 +114,7 @@ P:\GAPI07_Analitza\
 │   │   ├── etl_sp_load_client_attributes.sql
 │   │   ├── etl_sp_load_product_attributes.sql
 │   │   ├── etl_sp_load_receivables.sql
-│   │   ├── etl_sp_data_quality_checks.sql  ← 7 validacions abans del swap
+│   │   ├── etl_sp_data_quality_checks.sql  ← 8 validacions abans del swap
 │   │   └── etl_sp_swap_staging_to_prod.sql ← Swap atòmic staging→dbo
 │   │
 │   ├── cfg\                           ← Seeds de configuració
@@ -229,8 +229,9 @@ FROM audit.data_quality_warnings
 WHERE run_id = (SELECT MAX(run_id) FROM audit.etl_runs);
 ```
 
-Els checks són 7: orfes de client/producte, agent orfe, format `country_code`, signes coherents,
-fórmula `net_amount`, i volum anòmal.
+Els checks són 8: orfes de client/producte, agent orfe, format `country_code`, signes coherents,
+fórmula `net_amount`, volum anòmal, i **identificadors que desapareixen d'un dia per l'altre**
+(`vanished_ids`).
 
 ### Forçar una càrrega manual ara
 

@@ -393,6 +393,10 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'INCREMENTAL_WINDOW_DAYS
     INSERT cfg.settings ([key], [value], description)
     VALUES ('INCREMENTAL_WINDOW_DAYS', '7', 'Finestra (dies) que re-extreu sp_load_invoice_lines en mode incremental.');
 
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ID_DROP_MAX')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('ID_DROP_MAX', '10', 'Identificadors que poden desapareixer d un dia per l altre abans que el check vanished_ids passi de WARN a CRITICAL i aturi el swap. Apujar-lo expressament nomes si hi ha un canvi massiu previst (p.ex. el cutover).');
+
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FULL_RELOAD_WEEKDAY')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('FULL_RELOAD_WEEKDAY', '7', 'Dia de la setmana (1=dilluns..7=diumenge) en que sp_load_invoice_lines fa full reload.');

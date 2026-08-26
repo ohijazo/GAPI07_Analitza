@@ -26,6 +26,19 @@ el que els donava KAIS. **Les 8 taules `est_*` són un contracte, no un detall d
 sense separador de milers i amb punt decimal, signe negatiu **davant**, imports sempre sense IVA.
 `country_code` en minúscules i ISO 3166-1 de 2 caràcters.
 
+## Un identificador no pot desaparèixer
+
+Si un `id_client_location` que ahir hi era avui no hi és, Analitza no veu un error: veu un client
+que ha deixat de comprar. El mateix amb productes, famílies i comercials.
+
+El check `vanished_ids` de `sp_data_quality_checks` ho vigila cada nit comparant `dbo.*` (ahir)
+contra `staging.*` (avui). WARN si en són poques, **CRITICAL a partir de `cfg.settings.ID_DROP_MAX`**,
+i llavors s'atura el swap.
+
+Si algun dia cal apujar el llindar —un canvi massiu previst, com el cutover— es fa expressament i es
+torna a baixar. No s'ha de tocar per fer callar un avís que no s'entén: aquest check existeix
+precisament per als casos que no s'entenen.
+
 ## Analitza no veu mai dades a mig carregar
 
 L'ETL treballa sempre a `staging.*`, valida, i només si no hi ha cap warning `CRITICAL` fa

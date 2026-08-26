@@ -399,10 +399,9 @@ un client que ja existia es queda amb `U_FCCodiKais` buit, el COALESCE cau al Ca
 Analitza el veu com un client nou. En silenci, i el dia del tall, que és quan menys es mira. La
 població del camp ha de ser **completa i verificada** abans de l'1 de novembre.
 
-Check que ho cobriria, i que val la pena tant si s'accepta la proposta com si no: **avisar quan un
-`id_client_location` que ahir hi era avui desapareix**. `dbo.est_clients` té la foto d'ahir, o sigui
-que és un `EXCEPT` contra `staging`. Protegeix el contracte cada nit sense dependre que ningú se'n
-recordi. Ara mateix no existeix cap check d'aquest tipus.
+Aquest risc el cobreix el check **`vanished_ids`**, implementat el 26/08/2026: avisa quan un
+identificador que ahir hi era avui no hi és. Protegeix el contracte cada nit sense dependre que
+ningú se'n recordi.
 
 **Res d'això no està implementat**: primer cal la confirmació de l'Adrià.
 
@@ -583,10 +582,30 @@ SELECT step_name, status, rows_in, rows_out, duration_ms, LEFT(error_message,200
 FROM IntercanviSAP.audit.etl_step_log
 WHERE run_id = (SELECT MAX(run_id) FROM IntercanviSAP.audit.etl_runs) ORDER BY step_id;
 
--- Warnings de qualitat (7 checks)
+-- Warnings de qualitat (8 checks)
 SELECT severity, check_name, details FROM IntercanviSAP.audit.data_quality_warnings
 WHERE run_id = (SELECT MAX(run_id) FROM IntercanviSAP.audit.etl_runs);
 ```
+
+
+### El check `vanished_ids` (afegit 26/08/2026)
+
+Els identificadors que enviem a Analitza són un contracte. Si un `id_client_location` que ahir hi
+era avui no hi és, Analitza no veu un error: veu un client que ha deixat de comprar, i el dona per
+perdut. El mateix amb productes, famílies i comercials.
+
+`dbo.*` té la foto d'ahir i `staging.*` la d'avui, així que la comprovació és un `EXCEPT`. Cobreix
+una família sencera de fallades silencioses —un camp que es queda buit a l'origen, un filtre que
+descarta de més, un mapatge que canvia sense avisar— que **cap dels altres set checks detecta**,
+perquè totes deixen les taules coherents amb elles mateixes. El bug del `LineType` n'era una.
+
+WARN mentre siguin poques; **CRITICAL a partir de `cfg.settings.ID_DROP_MAX`** (per defecte 10), i
+llavors atura el swap. El llindar existeix perquè hi ha desaparicions legítimes, i perquè el dia
+del cutover pot caldre apujar-lo expressament.
+
+Provat el 26/08/2026 als tres casos: sense diferències no salta; amb 4 identificadors esborrats dona
+WARN sense bloquejar; amb el llindar a 2 dona CRITICAL i retorna `critical=1`, que és el que fa que
+`sp_run_all` avorti el swap.
 
 Estats de `etl_runs`: `SUCCESS` · `SUCCESS_NOSWAP` (cridat amb `@SkipSwap=1`) · `BLOCKED` (warnings
 CRITICAL, swap avortat, `dbo.*` es queda amb les dades d'ahir) · `FAILED`.

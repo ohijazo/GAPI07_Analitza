@@ -122,6 +122,85 @@ BEGIN
                     + ' (' + CAST(@today_count AS varchar(20)) + ') fora del +/-50% de la mitjana 4w del mateix dia setmana ('
                     + CAST(@avg_count AS varchar(20)) + ').');
 
+        /* ----- 8) Identificadors que desapareixen d'un dia per l'altre -----
+
+           Els identificadors que enviem a Analitza son un contracte: si un
+           id_client_location que ahir hi era avui no hi es, Analitza no veu un
+           error sino un client que ha deixat de comprar, i el dona per perdut.
+           El mateix amb productes, families i comercials.
+
+           dbo.* te la foto d'ahir i staging.* la d'avui, aixi que la comprovacio
+           es un EXCEPT. Cobreix una familia sencera de fallades silencioses: un
+           camp que es queda buit a l'origen, un filtre que descarta de mes, un
+           mapatge que canvia sense avisar. Cap dels altres checks la detecta,
+           perque totes deixen les taules coherents amb elles mateixes.
+
+           Es queda en WARN mentre siguin poques i passa a CRITICAL a partir del
+           llindar cfg.settings.ID_DROP_MAX. El llindar existeix perque hi ha
+           desaparicions legitimes (un client esborrat a SAP), i perque el dia
+           del cutover pot caldre apujar-lo expressament. -----*/
+        DECLARE @drop_max int;
+        SELECT @drop_max = TRY_CAST([value] AS int) FROM cfg.settings WHERE [key] = 'ID_DROP_MAX';
+        SET @drop_max = ISNULL(@drop_max, 10);
+
+        IF OBJECT_ID('tempdb..#vanished') IS NOT NULL DROP TABLE #vanished;
+        CREATE TABLE #vanished (
+            entity varchar(30)  COLLATE DATABASE_DEFAULT NOT NULL,
+            id     nvarchar(260) COLLATE DATABASE_DEFAULT NOT NULL
+        );
+
+        INSERT #vanished (entity, id)
+        SELECT 'est_clients', id_client_location FROM dbo.est_clients
+        EXCEPT
+        SELECT 'est_clients', id_client_location FROM staging.est_clients;
+
+        INSERT #vanished (entity, id)
+        SELECT 'est_productes', id_product FROM dbo.est_productes
+        EXCEPT
+        SELECT 'est_productes', id_product FROM staging.est_productes;
+
+        INSERT #vanished (entity, id)
+        SELECT 'est_agents', id_salesman FROM dbo.est_agents
+        EXCEPT
+        SELECT 'est_agents', id_salesman FROM staging.est_agents;
+
+        INSERT #vanished (entity, id)
+        SELECT 'est_families_productes', id_product_category FROM dbo.est_families_productes
+        EXCEPT
+        SELECT 'est_families_productes', id_product_category FROM staging.est_families_productes;
+
+        SELECT @cnt = COUNT(*) FROM #vanished;
+
+        IF @cnt > 0
+        BEGIN
+            DECLARE @vanished_detail nvarchar(max);
+
+            /* Resum per entitat, i uns quants exemples: sense els identificadors
+               concrets, el warning obliga a reconstruir la consulta a ma. */
+            SELECT @vanished_detail = STRING_AGG(x.txt, '; ') WITHIN GROUP (ORDER BY x.entity)
+            FROM (
+                SELECT entity, entity + '=' + CAST(COUNT(*) AS varchar(20)) AS txt
+                FROM   #vanished GROUP BY entity
+            ) x;
+
+            SELECT @vanished_detail = @vanished_detail + '. Exemples: '
+                 + STRING_AGG(CAST(y.id AS nvarchar(260)), ', ')
+            FROM (SELECT TOP 10 id FROM #vanished ORDER BY entity, id) y;
+
+            IF @cnt > @drop_max
+            BEGIN
+                INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+                VALUES (@rid, 'vanished_ids', 'CRITICAL',
+                        'Han desaparegut ' + CAST(@cnt AS varchar(20)) + ' identificadors respecte d ahir (llindar '
+                        + CAST(@drop_max AS varchar(20)) + '): ' + @vanished_detail);
+                SET @CriticalCount = @CriticalCount + 1;
+            END
+            ELSE
+                INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+                VALUES (@rid, 'vanished_ids', 'WARN',
+                        'Han desaparegut ' + CAST(@cnt AS varchar(20)) + ' identificadors respecte d ahir: ' + @vanished_detail);
+        END
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),
