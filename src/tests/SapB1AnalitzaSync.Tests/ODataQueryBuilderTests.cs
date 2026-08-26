@@ -11,11 +11,15 @@ public class ODataQueryBuilderTests
     /// pàgina. Aquí no s'emet mai; la paginació va per Prefer: odata.maxpagesize
     /// i odata.nextLink. Si algú el reintrodueix, aquest test ha de petar.
     /// </summary>
+    /// NOTA: s'assereix sobre "$top" i no sobre "%24top". QueryStringBuilder
+    /// escapa NOMES el valor, no la clau, aixi que les claus surten literals a
+    /// la URL. Fins al 26/08/2026 aquests tres guardians buscaven "%24..." i
+    /// per tant no podien fallar mai: donaven per bo qualsevol query.
     [Fact]
     public void Cap_consulta_emet_top()
     {
         foreach (var url in AllQueries())
-            Assert.DoesNotContain("%24top", url, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("$top", url, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Un $filter buit fa que Service Layer retorni HTTP 400.</summary>
@@ -23,7 +27,7 @@ public class ODataQueryBuilderTests
     public void Sense_cursor_no_semet_filter()
     {
         var url = ODataQueryBuilder.BuildSalesDocuments("DeliveryNotes", null);
-        Assert.DoesNotContain("%24filter", url, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("$filter", url, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -65,7 +69,7 @@ public class ODataQueryBuilderTests
     public void Cap_consulta_emet_expand()
     {
         foreach (var url in AllQueries())
-            Assert.DoesNotContain("%24expand", url, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("$expand", url, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Els UDFs han d'anar al $select o SL no els retorna.</summary>

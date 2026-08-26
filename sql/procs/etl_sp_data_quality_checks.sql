@@ -69,10 +69,14 @@ BEGIN
                     'Clients amb salesmen_id sense agent: ' + CAST(@cnt AS varchar(20)));
 
         /* ----- 4) country_code mal format (CRITICAL) ----- */
+        /* El COLLATE explicit no es decoratiu: la BD es CI_AS, aixi que sense
+           ell `country_code <> LOWER(country_code)` es sempre fals i la meitat
+           d'aquest check no pot detectar res. Comprovat el 26/08/2026. */
         SELECT @cnt = COUNT(*) FROM staging.est_clients
         WHERE  country_code IS NULL
             OR LEN(country_code) NOT BETWEEN 2 AND 4
-            OR country_code <> LOWER(country_code);
+            OR country_code COLLATE Latin1_General_CS_AS
+               <> LOWER(country_code) COLLATE Latin1_General_CS_AS;
         IF @cnt > 0
         BEGIN
             INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
