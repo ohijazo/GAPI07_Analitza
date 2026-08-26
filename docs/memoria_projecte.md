@@ -399,7 +399,9 @@ sempre aquest cap a Analitza.
 Per què un camp i no retallar el codi del nom del grup, que a les famílies també funcionaria: n'hi
 hauria prou que algú reanomenés un grup perquè es trenqués en silenci. Un camp propi no es trenca.
 
-Si l'Adrià ho accepta, la feina és: crear els UDFs a SAP, afegir-los a `sap_raw`, i canviar
+Els UDFs **els crea i els omple l'Oscar** (26/08/2026); als consultors de SAP només se'ls comunica,
+per `comunicacio_udfs_sap.docx`. Si l'Adrià accepta la proposta, la feina és: crear els UDFs a SAP,
+afegir-los a `sap_raw`, i canviar
 `sp_load_salesmen`, `sp_load_product_categories` i `sp_load_clients` perquè els projectin amb la
 regla **`id = COALESCE(U_FCCodiKais, <codi SAP>)`**: qui ve de KAIS manté el seu codi, qui és nou
 porta el de SAP. Els dos formats no es poden trepitjar (8 dígits vs `C` + 6).
@@ -693,7 +695,7 @@ Idempotent. **No** inclou `03_create_baseline.sql`, que es pren una sola vegada 
 Per a un document normal, sense retallar:
 
 ```
-python tools/md2docx.py peticio_udfs_sap.md peticio_udfs_sap.docx
+python tools/md2docx.py comunicacio_udfs_sap.md comunicacio_udfs_sap.docx
 ```
 
 ### Regenerar el .docx d'un correu
@@ -741,7 +743,7 @@ ules\      Regles del projecte (5)
 │   ├── security\ create_analitza_user · revoke_sap_direct_access
 │   ├── jobs\    sqlagent_analitza_etl_daily
 │   └── verify.sql · verify_migration.sql · deploy.sql · cleanup_master.sql
-└── correu_adria · resposta_adria_1 · peticio_udfs_sap ·
+└── correu_adria · resposta_adria_1 · comunicacio_udfs_sap ·
     draft_resposta_sistemes                                   (.md i .docx)
 ```
 
