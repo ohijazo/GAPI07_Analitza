@@ -205,34 +205,28 @@ Això és el que no es pot trencar. Està recollit a `.claude/rules/04-contracte
 | Check `vanished_ids` | ✅ desplegat 26/08 |
 | Login `analitza_ro`, només lectura, amb `DENY CONNECT` a `DB_FARINERA_TEST` i `SBO-COMMON` | des del principi |
 
-**⚠️ El pas 1 del job falla cada nit.** Comprovat a `msdb.dbo.sysjobhistory` el 26/08/2026:
+**El Worker corre a `AE01SAPRDP`, no al servidor de SQL.** El job de SQL Agent apuntava a
+`P:\GAPI07_Analitza\...`, i `P:` és una unitat de xarxa mapada a una carpeta personal: SQL Agent
+corre com a `SYSTEM`, no la veu, i el pas fallava amb *"The process could not be created"*.
 
-```
-The process could not be created for step 1
-Executed as user: AE01SAPSQL\SYSTEM
-```
+Es va decidir posar-lo al servidor d'aplicacions en comptes d'arreglar la ruta al servidor de SQL:
+`AE01SAPSQL` ja fa de base de dades, de SAP i de Service Layer, i a partir del cutover és la màquina
+més crítica. Procediment complet a `deploy/README.md`.
 
-**La causa no és la configuració, és la ruta.** El job apunta a
-`P:\GAPI07_Analitza\src\...\SapB1AnalitzaSync.Worker.exe`, i `P:` és una **unitat de xarxa**
-mapada a `\tomatera\Farinera\ohijazo`. SQL Agent corre com a `SYSTEM`, que no té aquest mapatge
-ni cap sessió d'usuari: no pot ni crear el procés. Ni arriba a mirar la configuració.
+**Conseqüència de disseny:** SQL Agent no pot llançar un procés en una altra màquina, així que el
+job torna a tenir **un sol pas** i són dos planificadors independents — la tasca a les 02:45 i el
+job a les 03:00. La garantia que no es transformi un mirall vell ja no la dona l'ordre dels passos,
+sinó la **guarda de frescor** de `sp_run_all`: si `sap_raw.sync_state` té més de
+`cfg.settings.MIRROR_MAX_AGE_HOURS` hores (6), avorta amb `ABORTED_STALE_MIRROR`.
 
-Falla de manera segura —el pas 2 no s'executa i `dbo.est_*` es queda amb les dades anteriors— però
-falla, i quan hi hagi Database Mail enviarà avís cada nit.
+La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2026): el mirall tenia
+**24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
+notava perquè no havia canviat res.
 
-**Per resoldre-ho calen tres coses, en aquest ordre:**
-
-1. **Publicar el Worker a una ruta local del servidor**, per exemple `C:\Apps\SapB1AnalitzaSync\`,
-   amb `dotnet publish -c Release`. La màquina necessita el runtime de .NET 8, o cal publicar-ho
-   autocontingut. Actualitzar `@WorkerExe` a `sqlagent_analitza_etl_daily.sql`.
-2. **Variables d'entorn de màquina** per al compte de SQL Agent: `ServiceLayer__BaseUrl`,
-   `__CompanyDb`, `__UserName`, `__Password`, `__AllowInvalidCertificates` i
-   `Database__ConnectionString`. Té sentit fer-ho alhora que es crea l'usuari tècnic dedicat (§9).
-3. Comprovar que el compte de SQL Agent pot sortir a la xarxa cap al Service Layer.
-
-**Nota de fons:** que tot el projecte visqui a `\tomatera\Farinera\ohijazo` —una carpeta
-personal— està bé per desenvolupar, però res que hagi d'anar a producció hi pot dependre. Si aquesta
-persona marxa o es reorganitza el recurs compartit, el desplegament es trenca.
+**`AE01SAPRDP` allotja webservices de col·laboradors externs.** Per això la configuració no va a
+variables d'entorn de màquina —qualsevol procés de la màquina les llegiria— sinó a un
+`appsettings.Production.json` al costat de l'executable, amb els permisos NTFS tancats al compte de
+la tasca.
 
 L'última execució verda del pipeline **antic** va ser el run 91 (24/08/2026), que és la que va
 generar la fotografia `baseline`.

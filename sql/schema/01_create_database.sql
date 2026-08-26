@@ -393,6 +393,10 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'INCREMENTAL_WINDOW_DAYS
     INSERT cfg.settings ([key], [value], description)
     VALUES ('INCREMENTAL_WINDOW_DAYS', '7', 'Finestra (dies) que re-extreu sp_load_invoice_lines en mode incremental.');
 
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'MIRROR_MAX_AGE_HOURS')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('MIRROR_MAX_AGE_HOURS', '6', 'Antiguitat maxima, en hores, de sap_raw.sync_state perque sp_run_all accepti transformar. El Worker corre com a tasca programada en una altra maquina; sense aquesta guarda, si no s executa, l ETL publicaria el mirall d ahir com si fos d avui.');
+
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'LINES_MIN_RATIO')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('LINES_MIN_RATIO', '0.95', 'Proporcio minima de files que ha de tenir staging.est_linies_albara respecte de dbo abans que el check lines_collapsed aturi el swap. Les linies son historic acumulat i no haurien de minvar. Abaixar-lo expressament nomes si hi ha un canvi previst (p.ex. el cutover, quan SAP productiva arrenca sense historic).');

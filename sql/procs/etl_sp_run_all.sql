@@ -13,10 +13,14 @@
       10. swap_staging_to_prod  (nomes si critical_count = 0)
    Loga a audit.etl_runs el resultat global.
 
-   PRECONDICIO: sap_raw ha d'estar fresc. El refresca SapB1AnalitzaSync.Worker
-   llegint SAP per Service Layer; al job Analitza_ETL_Daily el Worker es el
-   pas 1 i aquest SP el pas 2. Si el mirall es vell, aquest SP carregara dades
-   velles sense adonar-se'n: mirar sap_raw.sync_state si algun recompte sorpren.
+   PRECONDICIO: sap_raw ha d'estar fresc. El refresca SapB1AnalitzaSync.Worker,
+   que corre al servidor d'aplicacions com a tasca programada, no com a pas
+   d'aquest job. Son dos planificadors que no es parlen, aixi que aquest SP
+   COMPROVA la frescor del mirall abans de fer res i avorta si es vell.
+
+   Sense aquesta comprovacio, si la tasca del Worker no s'executa, l'ETL
+   transformaria el mirall d'ahir i publicaria dades velles com si fossin
+   d'avui, sense que saltes res.
    =========================================================================*/
 USE IntercanviSAP;
 GO
@@ -39,6 +43,36 @@ BEGIN
     SET @RunId = SCOPE_IDENTITY();
 
     DECLARE @critical int = 0;
+
+    /* ---- El mirall es prou fresc? ----
+       Es comprova ABANS de tocar staging: si el mirall es vell val mes no
+       haver comencat. L'entitat mes endarrerida marca l'edat del conjunt. */
+    DECLARE @max_age_h int;
+    SELECT @max_age_h = TRY_CAST([value] AS int) FROM cfg.settings WHERE [key] = 'MIRROR_MAX_AGE_HOURS';
+    SET @max_age_h = ISNULL(@max_age_h, 6);
+
+    DECLARE @oldest datetime2(0), @age_h int;
+    SELECT @oldest = MIN(updated_at) FROM sap_raw.sync_state;
+
+    IF @oldest IS NULL
+    BEGIN
+        UPDATE [audit].etl_runs
+           SET finished_at = SYSUTCDATETIME(), [status] = 'ABORTED_STALE_MIRROR',
+               error_message = 'sap_raw.sync_state es buit: el Worker no ha refrescat mai el mirall. No es transforma res.'
+         WHERE run_id = @RunId;
+        THROW 50101, 'sp_run_all: el mirall sap_raw no s ha refrescat mai. Executeu el Worker.', 1;
+    END
+
+    SET @age_h = DATEDIFF(HOUR, @oldest, SYSUTCDATETIME());
+    IF @age_h > @max_age_h
+    BEGIN
+        UPDATE [audit].etl_runs
+           SET finished_at = SYSUTCDATETIME(), [status] = 'ABORTED_STALE_MIRROR',
+               error_message = 'El mirall sap_raw te ' + CAST(@age_h AS varchar(10)) + ' hores (limit '
+                             + CAST(@max_age_h AS varchar(10)) + '). El Worker no ha corregut. dbo.est_* es queda com estava.'
+         WHERE run_id = @RunId;
+        THROW 50101, 'sp_run_all: el mirall sap_raw es massa vell. Reviseu la tasca del Worker.', 1;
+    END
 
     BEGIN TRY
         EXEC etl.sp_load_product_categories @RunId = @RunId;

@@ -40,3 +40,6 @@ Thumbs.db
 .agents/
 .claude/skills/
 skills-lock.json
+
+# Sortida de dotnet publish per desplegar al servidor (regenerable, ~70 MB)
+publish/
