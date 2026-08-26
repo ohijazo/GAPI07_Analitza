@@ -383,10 +383,28 @@ Per què un camp i no retallar el codi del nom del grup, que a les famílies tam
 hauria prou que algú reanomenés un grup perquè es trenqués en silenci. Un camp propi no es trenca.
 
 Si l'Adrià ho accepta, la feina és: crear els UDFs a SAP, afegir-los a `sap_raw`, i canviar
-`sp_load_salesmen`, `sp_load_product_categories` i `sp_load_clients` perquè els projectin.
-**Res d'això no està implementat**: primer cal la seva confirmació.
-- L'esborrany anterior de la resposta a l'Adrià donava per bona la regla
-  `CardCode = "C" + 6 últims dígits del codi KAIS`. **Les dades no la sostenen** i s'ha corregit.
+`sp_load_salesmen`, `sp_load_product_categories` i `sp_load_clients` perquè els projectin amb la
+regla **`id = COALESCE(U_FCCodiKais, <codi SAP>)`**: qui ve de KAIS manté el seu codi, qui és nou
+porta el de SAP. Els dos formats no es poden trepitjar (8 dígits vs `C` + 6).
+
+**El `new_code` canvia de semàntica.** L'esborrany del 25/08 proposava
+`new_code = COALESCE(U_FCNewCardCode, U_FCKaisCode)`. **Era erroni**: tenia sentit quan
+l'identificador era el codi de SAP i el `new_code` feia de pont cap a KAIS, però si el codi de KAIS
+*és* l'identificador, posar-lo també al `new_code` diu que el client ha canviat de codi a si mateix.
+`new_code` ha de portar només l'identificador del successor, i NULL la resta del temps. Cau també la
+idea de la columna `kais_code` separada.
+
+**Risc que introdueix el COALESCE.** És de la mateixa família que el bug del `LineType` (§Fase 4): si
+un client que ja existia es queda amb `U_FCCodiKais` buit, el COALESCE cau al CardCode de SAP i
+Analitza el veu com un client nou. En silenci, i el dia del tall, que és quan menys es mira. La
+població del camp ha de ser **completa i verificada** abans de l'1 de novembre.
+
+Check que ho cobriria, i que val la pena tant si s'accepta la proposta com si no: **avisar quan un
+`id_client_location` que ahir hi era avui desapareix**. `dbo.est_clients` té la foto d'ahir, o sigui
+que és un `EXCEPT` contra `staging`. Protegeix el contracte cada nit sense dependre que ningú se'n
+recordi. Ara mateix no existeix cap check d'aquest tipus.
+
+**Res d'això no està implementat**: primer cal la confirmació de l'Adrià.
 
 ### 6.5 Volum
 

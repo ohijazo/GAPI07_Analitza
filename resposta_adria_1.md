@@ -31,12 +31,38 @@ informat. No és cap invent, és estendre a la resta el que algú ja va fer bé 
 O sigui que les dues opcions que plantejaves —el fitxer de `new_code` i l'script que us modifiqui la
 base de dades— **no fan falta cap de les dues.**
 
-**El que sí que necessitem de tu** és la correspondència per poder omplir el camp dels clients:
-passa'ns la llista dels vostres codis de client amb el nom. El CIF el tenim a SAP i creuem
-nosaltres. Sense això hauríem d'anar només per nom, que és on surten els casos dubtosos.
+### I els clients nous?
 
-I una cosa que t'agrairé confirmar: **envia'm quatre dels vostres codis de família**. Els que tenim
-tenen pinta de ser els vostres, però prefereixo comprovar-ho que no pas suposar-ho.
+La regla és: **si té codi de KAIS, us enviem el de KAIS; si no en té, el de SAP.**
+
+Un client donat d'alta a SAP després del tall no ha existit mai a KAIS, així que us arribarà amb el
+seu codi de SAP (`C001024-000`) i el conservarà per sempre. Per vosaltres és el comportament correcte:
+és un client nou de debò i ha d'aparèixer com a tal.
+
+Això vol dir que a la llista hi conviuran els dos formats —`00001066-000` dels que venen de KAIS i
+`C001024-000` dels nous—, però no es poden trepitjar: els vostres són vuit dígits i els de SAP són
+una `C` i sis. Cap dels dos deixa de ser únic ni canvia mai.
+
+El mateix criteri per als comercials i les famílies.
+
+### El `new_code`
+
+Amb això, el `new_code` queda més net del que et vaig plantejar. Ja no fa de pont cap a KAIS —el
+pont és el propi identificador—, així que **només portarà l'identificador del successor** quan un
+client canviï de raó social: es desactiva un, se n'obre un altre, i el registre vell us diu quin és
+el nou. Igual que ara. La resta del temps anirà buit.
+
+Ho omplim nosaltres a cada canvi. I com que això depèn que algú se'n recordi, hi afegim una xarxa:
+si detectem un client nou amb el mateix NIF que un de desactivat, us l'enllacem igualment.
+
+### El que necessito de tu
+
+La correspondència per poder omplir el camp dels clients: **passa'm la llista dels vostres codis de
+client amb el nom**. El CIF el tenim a SAP i creuem nosaltres. Sense això hauríem d'anar només per
+nom, que és on surten els casos dubtosos.
+
+I **envia'm quatre dels vostres codis de família**, per confirmar que els que tenim són els vostres.
+Prefereixo comprovar-ho que no pas suposar-ho.
 
 ## El `discount` (el teu punt 10)
 
@@ -153,8 +179,28 @@ ohijazo@agrienergia.com
 >   poblat (48 de 49). A `OITM` no cal: els `ItemCode` ja són els de KAIS.
 > - Afegir-los a `sap_raw` i projectar-los a `sp_load_salesmen`, `sp_load_product_categories` i
 >   `sp_load_clients`.
+> - Regla d'emissió, la mateixa als tres mestres:
+>   `id = COALESCE(U_FCCodiKais, <codi SAP>)`. Els codis de KAIS són 8 dígits i els CardCode són
+>   `C` + 6, així que no es poden trepitjar.
+> - **Correcció respecte de l'esborrany anterior**: es proposava
+>   `new_code = COALESCE(U_FCNewCardCode, U_FCKaisCode)`. Això era erroni. Tenia sentit quan
+>   l'identificador era el codi de SAP i el `new_code` feia de pont cap a KAIS; si el codi de KAIS
+>   **és** l'identificador, posar-lo també al `new_code` diria que el client ha canviat de codi a
+>   si mateix. `new_code` ha de portar només l'identificador del successor, passat per la mateixa
+>   regla del COALESCE, i NULL la resta del temps. Cau també la idea de la columna `kais_code`
+>   separada: ja no fa falta.
 > - Detecció de successor per `FederalTaxID` a `sp_load_clients`, com a xarxa perquè
 >   `U_FCNewCardCode` no depengui només que algú se'n recordi d'omplir-lo.
+>
+> **Risc nou que introdueix el COALESCE, i és de la família del bug del `LineType`:** si un client
+> que ja existia es queda amb `U_FCCodiKais` buit, el COALESCE cau al CardCode de SAP i Analitza el
+> veu com un client nou. En silenci, i just el dia del tall, que és quan menys es mira. La població
+> del camp ha de ser completa i verificada abans de l'1 de novembre, no "gairebé completa".
+>
+> **Check de qualitat que ho cobriria, i que val la pena tant si s'accepta la proposta com si no:**
+> avisar quan un `id_client_location` que ahir hi era avui desapareix. `dbo.est_clients` té la foto
+> d'ahir, o sigui que és un `EXCEPT` contra `staging`. Protegeix el contracte cada nit i no depèn de
+> recordar-se de res. Ara mateix no existeix cap check d'aquest tipus.
 >
 > **Si accepta normalitzar el `discount`**, cal canviar tres coses alhora, i totes tres o cap:
 > - `sp_load_invoice_lines`: emetre `1 - multiplicador` en comptes del multiplicador.
