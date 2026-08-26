@@ -33,3 +33,10 @@ tools/spike/out/
 Thumbs.db
 .DS_Store
 ~$*.docx
+
+# Skills instal.lades amb `npx skills add`. Son eines de l'entorn de treball,
+# no contingut del projecte, i ocupen un parell de MB duplicats (a Windows els
+# symlinks fallen i es copien a .agents i a .claude alhora).
+.agents/
+.claude/skills/
+skills-lock.json
