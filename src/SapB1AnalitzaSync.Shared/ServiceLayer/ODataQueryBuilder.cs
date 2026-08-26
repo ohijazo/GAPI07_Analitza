@@ -119,6 +119,20 @@ public static class ODataQueryBuilder
     public static string BuildCustomersWithLinkCode()
     {
         var q = new QueryStringBuilder();
+        q.Append("$select", "CardCode,CardName,U_SEICodienllac,U_FCCodiKais,U_FCNewCardCode");
+        q.Append("$filter", "CardType eq 'cCustomer'");
+        q.Append("$orderby", "CardCode");
+        return "BusinessPartners?" + q;
+    }
+
+    /// <summary>
+    /// Sense els UDFs creats el 26/08/2026. Service Layer es cacheja les
+    /// metadades: fins que no se li reinicia el servei, demanar un UDF acabat
+    /// de crear respon 400 "Property ... is invalid".
+    /// </summary>
+    public static string BuildCustomersWithLinkCodeFallback()
+    {
+        var q = new QueryStringBuilder();
         q.Append("$select", "CardCode,CardName,U_SEICodienllac");
         q.Append("$filter", "CardType eq 'cCustomer'");
         q.Append("$orderby", "CardCode");

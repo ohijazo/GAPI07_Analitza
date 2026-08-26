@@ -61,6 +61,24 @@ if (filter.Length > 0) { /* emetre $filter */ }
   és `(UpdateDate, UpdateTime, key)`. Pàgines grans ho minimitzen i l'overlap d'un dia els recupera
   al cicle següent.
 
+## Un UDF nou no apareix a SL fins que es reinicia el servei
+
+Service Layer es cacheja les metadades de la companyia. Un camp d'usuari acabat de crear a SAP
+existeix a la base de dades i es veu a la interfície, però demanar-lo al `$select` respon:
+
+```json
+{"error":{"code":-1000,"message":{"value":"Property 'U_FCCodiKais' of 'BusinessPartner'is invalid"}}}
+```
+
+Cal **reiniciar el servei Service Layer** perquè el vegi. Comprovat el 26/08/2026 en crear
+`U_FCCodiKais` i `U_FCNewCardCode` a `OCRD` i `U_FCCodiKais` a `OITB`.
+
+Conseqüència pràctica: crear els UDFs i configurar el pipeline que els llegeix **no es pot fer
+seguit**. Cal la finestra de reinici entremig, i s'ha de planificar amb qui gestioni el servidor.
+
+La sonda (`--probe`) ho detecta i ho diu en comptes de petar: si demanar el camp respon 400, cau a
+una consulta sense els UDFs i avisa que falta el reinici.
+
 ## Traducció d'enums
 
 El mirall `sap_raw` guarda la **forma nativa de SAP**, no la de Service Layer, perquè els SPs de

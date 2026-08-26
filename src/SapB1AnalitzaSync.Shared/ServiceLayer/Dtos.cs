@@ -37,8 +37,14 @@ public sealed class PartnerRow
     public DateTime? UpdateDate { get; set; }
     public List<BPAddressRow>? BPAddresses { get; set; }
 
-    /// <summary>"Codi enllac": candidat a portar el codi de client de KAIS. Ho comprova la sonda.</summary>
+    /// <summary>"Codi enllac": candidat descartat a portar el codi de client de KAIS (nomes 10 de 500).</summary>
     public string? U_SEICodienllac { get; set; }
+
+    /// <summary>Codi del client a KAIS. Creat el 26/08/2026; s'omple abans de l'1 de novembre.</summary>
+    public string? U_FCCodiKais { get; set; }
+
+    /// <summary>CardCode del successor per canvi de rao social. Creat el 26/08/2026.</summary>
+    public string? U_FCNewCardCode { get; set; }
 }
 
 /// <summary>

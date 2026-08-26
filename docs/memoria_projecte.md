@@ -450,6 +450,15 @@ Recollits a `.claude/rules/02-service-layer-odata.md`. Cadascun ve d'un bug real
 - **Dos logins del mateix usuari en pocs segons** poden fallar amb `Invalid login credential.` És
   throttling del pool de sessions, no credencials dolentes.
 
+### Trobat en aquest projecte (26/08/2026)
+
+- **Un UDF nou no apareix a Service Layer fins que es reinicia el servei.** SL es cacheja les
+  metadades de la companyia: el camp existeix a SAP i es veu a la interfície, però al `$select`
+  respon `400 — Property 'U_FCCodiKais' of 'BusinessPartner' is invalid`.
+
+  Vol dir que **crear els UDFs i endollar-hi el pipeline no es pot fer seguit**: cal la finestra de
+  reinici entremig. La sonda ho detecta i ho diu en comptes de petar.
+
 ### Trobat en aquest projecte (25/08/2026)
 
 - **`BPAddresses` i `DocumentLines` NO s'`$expand`en.** A Service Layer v1 són col·leccions de

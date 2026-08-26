@@ -302,16 +302,51 @@ internal sealed class ProbeService
             report.AppendLine($"      SlpCode={s.SalesEmployeeCode} -> id_salesman='{IdSalesman(s.SalesEmployeeCode)}'  " +
                               $"KAIS='{s.U_FCCodiKais}'  {(IdSalesman(s.SalesEmployeeCode) == s.U_FCCodiKais!.Trim() ? "IGUAL" : "DIFEREIX")}  {s.SalesEmployeeName}");
 
-        var bps = await _sl.GetFirstPageAsync<PartnerRow>(
-            ODataQueryBuilder.BuildCustomersWithLinkCode(), ct).ConfigureAwait(false);
+        // Un UDF acabat de crear a SAP no apareix a Service Layer fins que se li
+        // refresquen les metadades (reinici del servei). Mentrestant, demanar-lo
+        // al $select respon 400 "Property ... is invalid". La sonda ho ha de dir,
+        // no petar: si peta, qui l'executa no sap si el problema es el camp, la
+        // xarxa o les credencials.
+        IReadOnlyList<PartnerRow> bps;
+        var udfsVisibles = true;
+        try
+        {
+            bps = await _sl.GetFirstPageAsync<PartnerRow>(
+                ODataQueryBuilder.BuildCustomersWithLinkCode(), ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            udfsVisibles = false;
+            bps = await _sl.GetFirstPageAsync<PartnerRow>(
+                ODataQueryBuilder.BuildCustomersWithLinkCodeFallback(), ct).ConfigureAwait(false);
+        }
         var withLink = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_SEICodienllac)).ToList();
+        var bpWithKais = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCCodiKais)).ToList();
+        var bpWithNew  = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCNewCardCode)).ToList();
 
         report.AppendLine($"CLIENTS (BusinessPartners): {bps.Count} a la mostra");
-        report.AppendLine($"   amb U_SEICodienllac informat : {withLink.Count}");
-        foreach (var b in withLink.Take(8))
-            report.AppendLine($"      CardCode={b.CardCode}  codienllac='{b.U_SEICodienllac}'  {b.CardName}");
-        if (withLink.Count == 0 && bps.Count > 0)
-            report.AppendLine($"      (mostra de CardCodes: {string.Join(", ", bps.Take(6).Select(b => b.CardCode))})");
+
+        if (!udfsVisibles)
+        {
+            report.AppendLine("   >>> Service Layer NO exposa encara U_FCCodiKais ni U_FCNewCardCode.");
+            report.AppendLine("       Els camps existeixen a SAP pero SL es cacheja les metadades:");
+            report.AppendLine("       cal reiniciar el servei Service Layer i tornar a executar la sonda.");
+            report.AppendLine($"   U_SEICodienllac informat : {withLink.Count} (camp descartat com a pont)");
+            return;
+        }
+
+        // Cobertura de U_FCCodiKais: ha d'arribar al 100% dels clients
+        // preexistents abans de l'1 de novembre. Si un es queda buit, el
+        // COALESCE cau al CardCode de SAP i Analitza el veu com un client nou.
+        report.AppendLine($"   U_FCCodiKais informat    : {Pct(bpWithKais.Count, bps.Count)}");
+        report.AppendLine($"   U_FCNewCardCode informat : {bpWithNew.Count} (buit es el normal: nomes s'omple als canvis de rao social)");
+        report.AppendLine($"   U_SEICodienllac informat : {withLink.Count} (camp descartat com a pont)");
+
+        if (bpWithKais.Count == 0)
+            report.AppendLine("   >>> El camp existeix pero encara no s'ha poblat cap client. Data limit: 1/11/2026.");
+        else
+            foreach (var b in bpWithKais.Take(5))
+                report.AppendLine($"      CardCode={b.CardCode}  KAIS='{b.U_FCCodiKais}'  {b.CardName}");
 
         var groups = await _sl.GetFirstPageAsync<ItemGroupRow>(
             ODataQueryBuilder.BuildItemGroups(), ct).ConfigureAwait(false);
