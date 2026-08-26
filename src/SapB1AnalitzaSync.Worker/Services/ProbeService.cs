@@ -354,10 +354,12 @@ internal sealed class ProbeService
         // Si es aixi, l'id que veu Analitza avui podria ser aquest i no el Number.
         var rx = new System.Text.RegularExpressions.Regex(@"^\d{4,8}-");
         var prefixed = groups.Count(g => g.GroupName is not null && rx.IsMatch(g.GroupName));
+        var grpWithKais = groups.Count(g => !string.IsNullOrWhiteSpace(g.U_FCCodiKais));
         report.AppendLine($"FAMILIES (ItemGroups): {groups.Count} a la mostra");
+        report.AppendLine($"   U_FCCodiKais informat : {Pct(grpWithKais, groups.Count)}");
         report.AppendLine($"   amb el nom en format <codi>-<descripcio> : {prefixed} de {groups.Count}");
         foreach (var g in groups.Take(8))
-            report.AppendLine($"      ItmsGrpCod={g.Number}  nom='{g.GroupName}'");
+            report.AppendLine($"      ItmsGrpCod={g.Number}  KAIS='{g.U_FCCodiKais}'  nom='{g.GroupName}'");
 
         var items = await _sl.GetFirstPageAsync<ItemRow>(
             ODataQueryBuilder.BuildItems(), ct).ConfigureAwait(false);

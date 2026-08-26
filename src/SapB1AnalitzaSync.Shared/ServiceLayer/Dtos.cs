@@ -82,6 +82,9 @@ public sealed class ItemGroupRow
 {
     public int? Number { get; set; }
     public string? GroupName { get; set; }
+
+    /// <summary>Codi de la familia a KAIS. Creat el 26/08/2026; s'omple abans de l'1 de novembre.</summary>
+    public string? U_FCCodiKais { get; set; }
 }
 
 public sealed class SalesPersonRow

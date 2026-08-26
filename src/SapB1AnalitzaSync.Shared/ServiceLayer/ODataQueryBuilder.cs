@@ -80,7 +80,7 @@ public static class ODataQueryBuilder
     public static string BuildItemGroups()
     {
         var q = new QueryStringBuilder();
-        q.Append("$select", "Number,GroupName");
+        q.Append("$select", "Number,GroupName,U_FCCodiKais");
         q.Append("$orderby", "Number");
         return "ItemGroups?" + q;
     }

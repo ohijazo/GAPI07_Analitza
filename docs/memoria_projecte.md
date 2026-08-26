@@ -400,7 +400,12 @@ Per què un camp i no retallar el codi del nom del grup, que a les famílies tam
 hauria prou que algú reanomenés un grup perquè es trenqués en silenci. Un camp propi no es trenca.
 
 Els UDFs **els crea i els omple l'Oscar** (26/08/2026); als consultors de SAP només se'ls comunica,
-per `comunicacio_udfs_sap.docx`. Si l'Adrià accepta la proposta, la feina és: crear els UDFs a SAP,
+per `comunicacio_udfs_sap.docx`.
+
+**Estat a 26/08/2026:** els tres camps ja estan **creats** a SAP i, després de reiniciar el Service
+Layer, són **llegibles** des del pipeline. Encara no s'ha poblat cap: `U_FCCodiKais` va a 0/500 als
+clients i 0/110 a les famílies. La sonda `--probe` ara reporta aquesta cobertura a cada execució,
+que és el que cal vigilar fins a l'1 de novembre. Si l'Adrià accepta la proposta, la feina és: crear els UDFs a SAP,
 afegir-los a `sap_raw`, i canviar
 `sp_load_salesmen`, `sp_load_product_categories` i `sp_load_clients` perquè els projectin amb la
 regla **`id = COALESCE(U_FCCodiKais, <codi SAP>)`**: qui ve de KAIS manté el seu codi, qui és nou
