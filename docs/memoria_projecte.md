@@ -205,15 +205,34 @@ Això és el que no es pot trencar. Està recollit a `.claude/rules/04-contracte
 | Check `vanished_ids` | ✅ desplegat 26/08 |
 | Login `analitza_ro`, només lectura, amb `DENY CONNECT` a `DB_FARINERA_TEST` i `SBO-COMMON` | des del principi |
 
-**⚠️ El pas 1 del job falla, i és esperat.** El Worker s'executa amb els user-secrets d'un usuari
-concret, que només es carreguen amb `DOTNET_ENVIRONMENT=Development`. El compte de servei de SQL
-Agent no els té: surt amb codi 3, el pas 2 no s'executa i `dbo.est_*` es queda amb les dades
-anteriors. **Falla de manera segura, però falla cada nit** i envia avís a `AnalitzaOps`.
+**⚠️ El pas 1 del job falla cada nit.** Comprovat a `msdb.dbo.sysjobhistory` el 26/08/2026:
 
-Per resoldre-ho calen variables d'entorn de màquina per al compte de SQL Agent:
-`ServiceLayer__BaseUrl`, `__CompanyDb`, `__UserName`, `__Password`,
-`__AllowInvalidCertificates` i `Database__ConnectionString`. Té sentit fer-ho alhora que es crea
-l'usuari tècnic dedicat (§9), per no haver de posar-hi dues vegades les credencials.
+```
+The process could not be created for step 1
+Executed as user: AE01SAPSQL\SYSTEM
+```
+
+**La causa no és la configuració, és la ruta.** El job apunta a
+`P:\GAPI07_Analitza\src\...\SapB1AnalitzaSync.Worker.exe`, i `P:` és una **unitat de xarxa**
+mapada a `\tomatera\Farinera\ohijazo`. SQL Agent corre com a `SYSTEM`, que no té aquest mapatge
+ni cap sessió d'usuari: no pot ni crear el procés. Ni arriba a mirar la configuració.
+
+Falla de manera segura —el pas 2 no s'executa i `dbo.est_*` es queda amb les dades anteriors— però
+falla, i quan hi hagi Database Mail enviarà avís cada nit.
+
+**Per resoldre-ho calen tres coses, en aquest ordre:**
+
+1. **Publicar el Worker a una ruta local del servidor**, per exemple `C:\Apps\SapB1AnalitzaSync\`,
+   amb `dotnet publish -c Release`. La màquina necessita el runtime de .NET 8, o cal publicar-ho
+   autocontingut. Actualitzar `@WorkerExe` a `sqlagent_analitza_etl_daily.sql`.
+2. **Variables d'entorn de màquina** per al compte de SQL Agent: `ServiceLayer__BaseUrl`,
+   `__CompanyDb`, `__UserName`, `__Password`, `__AllowInvalidCertificates` i
+   `Database__ConnectionString`. Té sentit fer-ho alhora que es crea l'usuari tècnic dedicat (§9).
+3. Comprovar que el compte de SQL Agent pot sortir a la xarxa cap al Service Layer.
+
+**Nota de fons:** que tot el projecte visqui a `\tomatera\Farinera\ohijazo` —una carpeta
+personal— està bé per desenvolupar, però res que hagi d'anar a producció hi pot dependre. Si aquesta
+persona marxa o es reorganitza el recurs compartit, el desplegament es trenca.
 
 L'última execució verda del pipeline **antic** va ser el run 91 (24/08/2026), que és la que va
 generar la fotografia `baseline`.
