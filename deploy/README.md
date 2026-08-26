@@ -104,16 +104,6 @@ Register-ScheduledTask -TaskName "GAPI07 Refresca sap_raw" `
     -RunLevel Limited
 ```
 
-L'entorn ha de ser `Production` perquè agafi l'`appsettings.Production.json`. Es fa amb una variable
-d'entorn **d'usuari** del compte de la tasca:
-
-```powershell
-[Environment]::SetEnvironmentVariable("DOTNET_ENVIRONMENT", "Production", "User")
-```
-
-(executat en una sessió d'aquell compte), o afegint-ho a l'script d'arrencada. Si no es fa, el
-Worker arrenca sense configuració i surt amb codi 3.
-
 ## 5. Provar-la
 
 ```powershell
@@ -127,7 +117,7 @@ Get-ScheduledTaskInfo -TaskName "GAPI07 Refresca sap_raw" | Format-List TaskName
 |---|---|
 | 0 | Correcte |
 | 1 | El cicle ha fallat: mira el log de la consola |
-| 3 | Falta configuració (`BaseUrl` buit o amb `<placeholder>`) |
+| 3 | Falta configuració: l'`appsettings.json` encara té els placeholders |
 | 2147942401 | No troba l'executable, o el compte no hi té permisos |
 
 I des de SQL Server, la comprovació que de veritat importa:
@@ -157,8 +147,8 @@ FROM   IntercanviSAP.audit.etl_runs ORDER BY run_id DESC;
 
 ## Al cutover (2 de novembre)
 
-Canviar `CompanyDb` a `DB_FARINERA_PROD` a l'`appsettings.Production.json` i reiniciar res: la tasca
-el rellegeix a cada execució.
+Canviar `CompanyDb` a `DB_FARINERA_PROD` a l'`appsettings.json` del servidor. No cal reiniciar res:
+la tasca el rellegeix a cada execució.
 
 I recorda abaixar `cfg.settings.LINES_MIN_RATIO` aquell dia: la SAP productiva arrenca sense
 històric d'albarans i el recompte caurà a propòsit, cosa que el check `lines_collapsed` bloquejaria.
