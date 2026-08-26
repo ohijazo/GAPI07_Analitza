@@ -94,7 +94,9 @@ while i < len(lines):
         blocks.append(('table', rows))
         continue
 
-    if line.startswith('## '):
+    if line.startswith('### '):
+        close(); blocks.append(('h3', line[4:]))
+    elif line.startswith('## '):
         close(); blocks.append(('h2', line[3:]))
     elif re.match(r'^[-*]\s+', line):
         close(); kind = 'bullet'; buf = [re.sub(r'^[-*]\s+', '', line)]
@@ -114,6 +116,8 @@ for kind, content in blocks:
         flush_table(content)
     elif kind == 'h2':
         add_runs(doc.add_heading(level=2), content)
+    elif kind == 'h3':
+        add_runs(doc.add_heading(level=3), content)
     elif kind == 'bullet':
         add_runs(doc.add_paragraph(style='List Bullet'), content)
     elif kind == 'number':
