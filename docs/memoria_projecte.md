@@ -665,17 +665,26 @@ P:\GAPI07_Analitza\deploy_via_powershell.ps1     # sqlcmd no està instal.lat en
 
 Idempotent. **No** inclou `03_create_baseline.sql`, que es pren una sola vegada i a mà.
 
+### Regenerar el .docx d'un document
+
+Per a un document normal, sense retallar:
+
+```
+python tools/md2docx.py peticio_udfs_sap.md peticio_udfs_sap.docx
+```
+
 ### Regenerar el .docx d'un correu
 
 Els correus viuen en parella `.md` (font, amb la nota interna al final) i `.docx` (el que s'envia,
 només el cos). Per no desincronitzar-los:
 
 ```
-python tools/md2docx.py resposta_adria_1.md resposta_adria_1.docx
+python tools/md2docx.py resposta_adria_1.md resposta_adria_1.docx ^
+    --from "Hola Adrià," --to "ohijazo@agrienergia.com"
 ```
 
-El conversor talla des de la salutació fins a la signatura, així que **la nota interna no hi entra
-mai**. Si el `.docx` està obert al Word, la regeneració falla amb `PermissionError` i el fitxer es
+`--from` i `--to` retallen el cos, així que **la capçalera de destinataris i la nota interna no hi
+entren mai**. Si el `.docx` està obert al Word, la regeneració falla amb `PermissionError` i el fitxer es
 queda enrere en silenci: tancar-lo abans.
 
 ### Afegir un UDF nou com a atribut
@@ -692,7 +701,8 @@ Ara són quatre llocs, i si se'n salta un el camp arriba buit sense error:
 ## 11. Estructura del codi
 
 ```
-P:\GAPI07_Analitza├── CLAUDE.md + .claudeules\      Regles del projecte (5)
+P:\GAPI07_Analitza├── CLAUDE.md + .claude
+ules\      Regles del projecte (5)
 ├── docs│   ├── memoria_projecte.md         Aquest fitxer
 │   ├── correus_adria_2025-05-12.md Els correus de l'Adrià, transcrits dels PDF
 │   ├── Guia de importación de datos Analitza CM v9.pdf
@@ -708,7 +718,8 @@ P:\GAPI07_Analitza├── CLAUDE.md + .claudeules\      Regles del projecte (
 │   ├── security\ create_analitza_user · revoke_sap_direct_access
 │   ├── jobs\    sqlagent_analitza_etl_daily
 │   └── verify.sql · verify_migration.sql · deploy.sql · cleanup_master.sql
-└── correu_adria · resposta_adria_1 · draft_resposta_sistemes   (.md i .docx)
+└── correu_adria · resposta_adria_1 · peticio_udfs_sap ·
+    draft_resposta_sistemes                                   (.md i .docx)
 ```
 
 **Els correus van en parella `.md` + `.docx`.** El `.md` és la font i porta una nota interna al

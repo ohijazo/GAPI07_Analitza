@@ -1,9 +1,16 @@
-# Converteix el cos del correu (markdown) a .docx.
-# No es un conversor generic: nomes cobreix el que fa servir aquest document
+# Converteix un markdown del projecte a .docx.
+# No es un conversor generic: nomes cobreix el que fem servir aqui
 # (encapcalaments, taules, llistes, negreta i codi inline).
 #
-# Deliberadament NOMES agafa el text que va de la salutacio fins a la signatura:
-# la nota interna del final del .md no ha de sortir mai al Word.
+#   md2docx.py <font.md> <sortida.docx> [--from "<marca>"] [--to "<marca>"]
+#
+# Per als correus cal retallar: el .md porta la capcalera de destinataris i una
+# nota interna al final que NO ha de sortir mai al Word. Exemple:
+#
+#   md2docx.py resposta_adria_1.md resposta_adria_1.docx \
+#       --from "Hola Adria," --to "ohijazo@agrienergia.com"
+#
+# Per a un document normal no cal retallar res i s'omet.
 import io, re, sys
 from docx import Document
 from docx.shared import Pt, RGBColor
@@ -11,13 +18,28 @@ from docx.shared import Pt, RGBColor
 src, dst = sys.argv[1], sys.argv[2]
 md = io.open(src, encoding='utf-8').read()
 
-# La salutacio de debo va sola en una linia. Buscar "Hola Adria" a seques
-# enganxaria la nota d'avis del capcal, que la cita entre cometes.
-m = re.search(r'^Hola Adrià,\s*$', md, re.M)
-if not m:
-    sys.exit('No s\'ha trobat la salutacio "Hola Adrià," en una linia propia.')
-start = m.start()
-end = md.index('ohijazo@agrienergia.com', start) + len('ohijazo@agrienergia.com')
+def opt(name):
+    i = sys.argv.index(name) if name in sys.argv else -1
+    return sys.argv[i + 1] if 0 < i < len(sys.argv) - 1 else None
+
+frm, to = opt('--from'), opt('--to')
+
+start = 0
+if frm:
+    # Ancorat a inici de linia: si no, una marca citada dins d'un altre
+    # paragraf (p.ex. la nota d'avis del capcal) es menjaria el tall.
+    m = re.search(r'^' + re.escape(frm), md, re.M)
+    if not m:
+        sys.exit(f"No s'ha trobat la marca d'inici: {frm}")
+    start = m.start()
+
+end = len(md)
+if to:
+    i = md.find(to, start)
+    if i < 0:
+        sys.exit(f"No s'ha trobat la marca final: {to}")
+    end = i + len(to)
+
 body = md[start:end]
 
 doc = Document()
@@ -75,7 +97,7 @@ in_signature = False
 while i < len(lines):
     line = lines[i].rstrip()
 
-    if line.startswith('Salutacions,'):
+    if line.startswith('Salutacions,') or line.startswith('Atentament,'):
         in_signature = True
     if in_signature:
         close()
@@ -94,7 +116,9 @@ while i < len(lines):
         blocks.append(('table', rows))
         continue
 
-    if line.startswith('### '):
+    if line.startswith('# ') and not line.startswith('## '):
+        close(); blocks.append(('h1', line[2:]))
+    elif line.startswith('### '):
         close(); blocks.append(('h3', line[4:]))
     elif line.startswith('## '):
         close(); blocks.append(('h2', line[3:]))
@@ -114,6 +138,8 @@ close()
 for kind, content in blocks:
     if kind == 'table':
         flush_table(content)
+    elif kind == 'h1':
+        add_runs(doc.add_heading(level=1), content)
     elif kind == 'h2':
         add_runs(doc.add_heading(level=2), content)
     elif kind == 'h3':
