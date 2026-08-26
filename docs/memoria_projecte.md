@@ -223,6 +223,18 @@ La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2
 **24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
 notava perquè no havia canviat res.
 
+**Bloquejat**: no tenim accés a `AE01SAPRDP`. El desplegament el fa Sistemes, amb la petició de
+`peticio_sistemes_worker.docx`. Fins llavors el job de les 03:00 avortarà amb
+`ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
+
+**Tres usuaris diferents, i els crea gent diferent:**
+
+| Usuari | Per a què | Qui |
+|---|---|---|
+| Windows (`AGRIENERGIA\svc_gapi07`) | Executar la tasca a `AE01SAPRDP` | Sistemes |
+| SAP Service Layer (`GAPI07_RO`) | Llegir SAP. Ara va amb `OHijazo`, nominal | Oscar |
+| SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. Ara va amb `sa` | Oscar — `sql/security/create_worker_user.sql` |
+
 **`AE01SAPRDP` allotja webservices de col·laboradors externs.** Per això la configuració no va a
 variables d'entorn de màquina —qualsevol procés de la màquina les llegiria— sinó a un
 `appsettings.Production.json` al costat de l'executable, amb els permisos NTFS tancats al compte de
