@@ -193,13 +193,30 @@ Això és el que no es pot trencar. Està recollit a `.claude/rules/04-contracte
 
 ## 5. Estat actual
 
-### Desplegat i corrent
+### Desplegat i corrent (a 26/08/2026)
 
-- BD `IntercanviSAP` a `AE01SAPSQL`, 8 taules `est_*` a `dbo` i `staging`
-- Job `Analitza_ETL_Daily` cada dia a les 03:00 — **encara amb el pipeline antic**, 1 sol pas
-- Login `analitza_ro` amb permisos només de lectura, i `DENY CONNECT` explícit a `DB_FARINERA_TEST`
-  i `SBO-COMMON`
-- Últimes execucions verdes, 0 warnings CRITICAL (run 91: 24/08/2026)
+| Peça | Estat |
+|---|---|
+| BD `IntercanviSAP`, 8 taules `est_*` a `dbo` i `staging` | des del principi |
+| Schema `sap_raw` (14 taules) | ✅ desplegat 24/08 |
+| Schema `baseline` amb la fotografia del run 91 | ✅ pres 24/08 |
+| Els 11 stored procedures, ja llegint `sap_raw` | ✅ desplegats 25/08 |
+| Job `Analitza_ETL_Daily`, **2 passos** (Worker + ETL), 03:00 | ✅ desplegat 25/08 |
+| Check `vanished_ids` | ✅ desplegat 26/08 |
+| Login `analitza_ro`, només lectura, amb `DENY CONNECT` a `DB_FARINERA_TEST` i `SBO-COMMON` | des del principi |
+
+**⚠️ El pas 1 del job falla, i és esperat.** El Worker s'executa amb els user-secrets d'un usuari
+concret, que només es carreguen amb `DOTNET_ENVIRONMENT=Development`. El compte de servei de SQL
+Agent no els té: surt amb codi 3, el pas 2 no s'executa i `dbo.est_*` es queda amb les dades
+anteriors. **Falla de manera segura, però falla cada nit** i envia avís a `AnalitzaOps`.
+
+Per resoldre-ho calen variables d'entorn de màquina per al compte de SQL Agent:
+`ServiceLayer__BaseUrl`, `__CompanyDb`, `__UserName`, `__Password`,
+`__AllowInvalidCertificates` i `Database__ConnectionString`. Té sentit fer-ho alhora que es crea
+l'usuari tècnic dedicat (§9), per no haver de posar-hi dues vegades les credencials.
+
+L'última execució verda del pipeline **antic** va ser el run 91 (24/08/2026), que és la que va
+generar la fotografia `baseline`.
 
 ### Xifres reals a test (run 91)
 
@@ -460,6 +477,18 @@ Recollits a `.claude/rules/02-service-layer-odata.md`. Cadascun ve d'un bug real
 | `deploy_via_powershell.ps1` no incloïa `02_create_sap_raw.sql` ni `seed_zone_code_mapping.sql` | ídem | ✅ |
 | Precedència d'`EXCEPT`/`UNION ALL` mal parentitzada a la comparació de Fase 4 | `verify_migration.sql` | ✅ Detectat abans d'executar-lo; `A EXCEPT B UNION ALL C EXCEPT D` no vol dir el que sembla |
 
+### Paranys que continuen al codi
+
+**`deploy.sql` NO és idempotent, encara que ho digui.** `01_create_database.sql` comença amb
+`DROP TABLE dbo.est_*` — les vuit taules que llegeix Analitza — per tornar-les a crear buides.
+Executar `deploy.sql` sencer deixa Analitza sense dades fins a la següent càrrega correcta.
+
+Per això el 25/08 es van desplegar **només els procediments**, un per un, i no amb `deploy.sql`.
+
+Cal decidir què se'n fa: o s'hi posa una guarda que impedeixi executar-lo si `dbo.est_*` té files,
+o es treu la paraula "idempotent" del capçal i del README i es documenta com a script de creació
+inicial. **Mentre no es faci, no executar `deploy.sql` en un entorn amb dades.**
+
 ### Falsa alarma
 
 Els runs de `audit.etl_runs` surten a la 01:00 i el job està programat a les 03:00. No és cap
@@ -476,15 +505,32 @@ desajust: `etl_runs.started_at` guarda **UTC** i a l'agost anem a UTC+2.
   logs d'auditoria de SAP atribuirien les lectures de l'ETL a una persona, i el dia que aquesta
   persona canviï la contrasenya o marxi, l'ETL peta. Cal crear un usuari tècnic dedicat de només
   lectura.
-- **`product_cost`**: preguntar a l'Adrià (§6.2).
+- **`product_cost`**: acordar amb l'Adrià quina definició de cost hi posem (§6.2). De moment surt
+  **0 a propòsit** (`Sync:CostField = "none"`), perquè es vegi que no el tenim.
+- **Normalitzar el `discount`.** L'Adrià ens diu (26/08/2026) que la convenció de KAIS també estava
+  malament: segons la seva guia, `discount` és el **percentatge** (0.25 = 25%) i la fórmula és
+  `net_amount = price × qty × (1 - discount)`. KAIS els enviava el multiplicador, i ho tapen amb un
+  `1 - discount` al seu costat. Nosaltres hem replicat la convenció de KAIS.
+
+  Se li proposa normalitzar-ho el dia del tall. **Si accepta, van tres canvis alhora, tots tres o
+  cap:**
+  1. `sp_load_invoice_lines`: emetre `1 - multiplicador`.
+  2. `sp_data_quality_checks`: el check `formula_break` passa a `price × qty × (1 - discount)`.
+  3. `.claude/rules/04-contracte-analitza.md` i aquesta memòria, que ara documenten la convenció
+     del multiplicador com si fos la bona.
+
+  Si ell no treu el seu `1 - discount` el mateix dia, falla de manera sorollosa: els descomptes
+  passarien de `0.00` a `1.00` i els imports sortirien a zero. Val més això que un error silenciós.
 - **Refresc de `DB_FARINERA_TEST` des de productiva**, per poder validar de debò.
 
 ### Migració
 
-- Backfill inicial de documents i primer `--once` complet
-- Desplegar els 8 SPs nous i el job de 2 passos
-- Fase 4: `verify_migration.sql` fins a 0 diferències
-- Fase 5: `sql/security/revoke_sap_direct_access.sql`
+Fases 0 a 4 tancades (§5, §6). Queda:
+
+- **Configurar el Worker per al compte de SQL Agent**, o el job seguirà fallant cada nit (§5).
+- **Fase 5**: executar `sql/security/revoke_sap_direct_access.sql`. Fins que no es faci, la
+  prohibició de llegir taules internes de SAP és només documental: tècnicament encara es pot.
+- Resoldre l'única diferència que queda contra `baseline`: `product_cost` (§6.2).
 
 ### Del projecte, anteriors a la migració
 
@@ -537,7 +583,7 @@ SAP arrenca.
 
 - **Rotar la contrasenya de `sa`**: ha quedat exposada durant la sessió del 25/08/2026
 - Login dedicat per a l'ETL i el Worker en comptes de `sa`
-- Primer commit del repo (`git init` fet, cap commit encara)
+- ~~Primer commit del repo~~ ✅ fet el 25/08 (`ef846fa`)
 
 ---
 
@@ -619,6 +665,19 @@ P:\GAPI07_Analitza\deploy_via_powershell.ps1     # sqlcmd no està instal.lat en
 
 Idempotent. **No** inclou `03_create_baseline.sql`, que es pren una sola vegada i a mà.
 
+### Regenerar el .docx d'un correu
+
+Els correus viuen en parella `.md` (font, amb la nota interna al final) i `.docx` (el que s'envia,
+només el cos). Per no desincronitzar-los:
+
+```
+python tools/md2docx.py resposta_adria_1.md resposta_adria_1.docx
+```
+
+El conversor talla des de la salutació fins a la signatura, així que **la nota interna no hi entra
+mai**. Si el `.docx` està obert al Word, la regeneració falla amb `PermissionError` i el fitxer es
+queda enrere en silenci: tancar-lo abans.
+
 ### Afegir un UDF nou com a atribut
 
 Ara són quatre llocs, i si se'n salta un el camp arriba buit sense error:
@@ -633,25 +692,27 @@ Ara són quatre llocs, i si se'n salta un el camp arriba buit sense error:
 ## 11. Estructura del codi
 
 ```
-P:\GAPI07_Analitza\
-├── CLAUDE.md + .claude\rules\      Regles del projecte (5)
-├── docs\
-│   ├── memoria_projecte.md         Aquest fitxer
+P:\GAPI07_Analitza├── CLAUDE.md + .claudeules\      Regles del projecte (5)
+├── docs│   ├── memoria_projecte.md         Aquest fitxer
+│   ├── correus_adria_2025-05-12.md Els correus de l'Adrià, transcrits dels PDF
 │   ├── Guia de importación de datos Analitza CM v9.pdf
 │   └── Integracio_GAPI07.pdf
-├── src\
-│   ├── SapB1AnalitzaSync.Shared\   Opcions, ODataQueryBuilder, SapEnums, DTOs
+├── tools│   └── md2docx.py                  Genera el .docx d'un correu des del .md
+├── src│   ├── SapB1AnalitzaSync.Shared\   Opcions, ODataQueryBuilder, SapEnums, DTOs
 │   ├── SapB1AnalitzaSync.Worker\   ServiceLayerClient, MirrorSyncService,
 │   │                               MirrorRepository, MirrorTables, ProbeService
-│   └── tests\                      xUnit — 23 tests
-└── sql\
-    ├── schema\  01_create_database · 02_create_sap_raw · 03_create_baseline
-    ├── procs\   11 stored procedures
-    ├── cfg\     seeds de país, zona i atributs
-    ├── security\ create_analitza_user · revoke_sap_direct_access
-    ├── jobs\    sqlagent_analitza_etl_daily
-    └── verify.sql · verify_migration.sql · deploy.sql · cleanup_master.sql
+│   └── tests\                      xUnit — 27 tests
+├── sql│   ├── schema\  01_create_database · 02_create_sap_raw · 03_create_baseline
+│   ├── procs\   11 stored procedures
+│   ├── cfg\     seeds de país, zona i atributs
+│   ├── security\ create_analitza_user · revoke_sap_direct_access
+│   ├── jobs\    sqlagent_analitza_etl_daily
+│   └── verify.sql · verify_migration.sql · deploy.sql · cleanup_master.sql
+└── correu_adria · resposta_adria_1 · draft_resposta_sistemes   (.md i .docx)
 ```
+
+**Els correus van en parella `.md` + `.docx`.** El `.md` és la font i porta una nota interna al
+final que **no s'envia**; el `.docx` el genera `tools/md2docx.py` agafant només el cos. Veure §10.
 
 ---
 

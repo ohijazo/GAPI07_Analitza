@@ -147,10 +147,11 @@ línies gairebé buida i anirà creixent — que no us espanti.
 ## Un tema menor
 
 Feu servir `product_cost`. El que us arribava de KAIS és el cost de l'article **congelat al moment de
-l'albarà**, i pel canal per on ara llegim SAP aquest valor no s'exposa. El candidat més proper quadra
-el 92% dels casos, però és un altre concepte —el preu de compra actual de l'article— i aniria
-derivant sense que ningú se n'adonés. De moment us arribarà a zero, a propòsit, perquè es vegi. En
-parlem cinc minuts i acordem què hi posem.
+l'albarà**, i per aquesta via no el tenim: llegim SAP per la seva API oficial en comptes d'anar
+directament a les taules, i aquest camp concret no s'hi exposa. El candidat més proper quadra el 92%
+dels casos, però és un altre concepte —el preu de compra actual de l'article— i aniria derivant
+sense que ningú se n'adonés. De moment us arribarà a zero, a propòsit, perquè es vegi. En parlem
+cinc minuts i acordem què hi posem.
 
 *(De `product_cost_2` no en dius res, així que entenem que no el feu servir.)*
 
