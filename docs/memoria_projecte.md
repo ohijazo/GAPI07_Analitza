@@ -17,7 +17,10 @@ Aquest projecte substitueix aquell origen: extreu de SAP B1, transforma al forma
 proporcionava, i publica una base de dades intermèdia de només lectura que Analitza consulta amb
 **les mateixes consultes SQL que ja tenia**. Analitza no ha de canviar res.
 
-**Cutover a productiva previst: Novembre 2026.**
+**Cutover a productiva: 2 de novembre de 2026.** És un **tall sec**: aquell dia es comença a
+treballar amb SAP i a KAIS ja no hi entren dades. No hi haurà cap període amb els dos ERPs rebent
+les mateixes operacions, així que **una comparació KAIS contra SAP no serà possible mai**, ni abans
+ni després. Tot el que es pugui validar abans, s'ha de validar sobre estructura i mestres.
 
 ### La restricció que ho condiciona tot
 
@@ -499,8 +502,19 @@ de quin històric es comptarà? Disposaran d'una base de dades de test?
 > I la convenció de la casa és el prefix `U_FC` (els UDFs existents fan servir `U_SEI`, del
 > partner Seidor).
 
-**Bloc E — Cutover Novembre 2026:** validació en paral·lel amb KAIS; canviar
-`ServiceLayer:CompanyDb` a `DB_FARINERA_PROD`; verificar la primera execució productiva.
+**Bloc E — Cutover, 2 de novembre de 2026.** Tall sec: KAIS deixa de rebre dades el mateix dia que
+SAP arrenca.
+
+- **Data límit 1 de novembre**, no el dia 2: els UDFs amb els codis de KAIS han d'estar creats i
+  **poblats** abans. Si el dia 2 s'envien els codis de SAP, Analitza els ingereix com a clients nous
+  i desfer-ho després surt molt més car que fer-ho bé d'entrada. Això converteix la creació dels
+  UDFs en feina amb data.
+- El dia 2: canviar `ServiceLayer:CompanyDb` a `DB_FARINERA_PROD` i, si l'Adrià ho accepta,
+  normalitzar el `discount` de manera coordinada.
+- Els primers dies: revisar amb ell que les xifres siguin coherents. No es podran comparar amb
+  KAIS; es comparen contra el negoci.
+- `est_linies_albara` arrencarà gairebé buida i anirà creixent: a la SAP productiva no hi haurà
+  albarans anteriors al tall.
 
 ### Higiene
 

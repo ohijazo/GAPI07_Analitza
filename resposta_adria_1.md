@@ -66,23 +66,55 @@ Anem a això, que és el que et desbloqueja per començar a mirar dades.
 - **VPN**: si reaprofites l'actual, cal comprovar que et doni ruta a aquest servidor, que és en un
   altre segment intern. Digue'm des de quina IP sortiu i ho validem; si no hi arriba, l'estenem.
 
+## Què podràs validar ara, i què no
+
+Aquí he de ser clar amb tu, perquè si no perdràs el temps.
+
+**Ara pots validar l'estructura i els mestres.** `IntercanviSAP` s'alimenta de l'entorn de **test**
+de SAP, i els mestres sí que són dades de debò: 5.651 ubicacions de client, 2.028 productes, 110
+famílies i 49 comercials. Val la pena que t'hi connectis i comprovis que les teves SQL corren, que
+els formats et van bé i, sobretot, que els codis lliguen amb els que tens.
+
+**Ara NO pots validar xifres.** L'entorn de test de SAP gairebé no té albarans: seixanta-dues línies,
+i escrites a mà per anar provant. Comparar facturació o marges contra el que et dona KAIS no et dirà
+res, perquè no són els mateixos fets: KAIS té l'operativa real i SAP test no té operativa.
+
+**Les xifres es validaran a partir del tall.** El **2 de novembre** comencem a treballar amb SAP i a
+KAIS ja no hi entraran dades: no hi haurà cap període amb els dos sistemes rebent les mateixes
+operacions. Això vol dir que una comparació KAIS contra SAP no arribarà a ser possible mai, ni abans
+ni després. A partir del 2 de novembre validarem contra el negoci: el que digui SAP i el que
+esperem que surti.
+
+**I una cosa important si connectes abans**: connecta't a mirar, però **no enganxis encara la teva
+ingesta de producció**. Com que `invoice_lines` la carregueu de forma incremental, aquestes 62
+línies de prova se us quedarien a dins barrejades amb l'històric bo.
+
+Una precisió perquè no et pensis que tens més garanties de les que et puc donar: pel nostre costat
+comparem cada càrrega contra una fotografia de la sortida anterior, i ara mateix set de les vuit
+taules surten idèntiques. Això valida **la nostra manera nova de llegir SAP contra la nostra manera
+antiga de llegir SAP**. És una comprovació de la canonada, no una equivalència entre KAIS i SAP:
+aquesta no la pot demostrar ningú fins que SAP tingui operativa real.
+
 ## Com farem el tall
 
-M'ho preguntaves i és just concretar-ho:
+1. **D'aquí al 2 de novembre**: tu valides estructura i mestres amb l'entorn de test, i tanquem la
+   correspondència de codis.
 
-1. **Setmanes de validació en paral·lel.** Seguiu carregant de l'`Intercanvi` actual per a producció
-   i alhora us connecteu a `IntercanviSAP` per contrastar. Comparem recomptes, facturacions i marges
-   fins que quadri.
-2. Del nostre costat ja ho fem amb el mateix criteri: cada càrrega es compara contra una fotografia
-   de la sortida antiga, taula per taula i fila per fila. Ara mateix set de les vuit taules surten
-   idèntiques.
-3. **El dia del tall** només canviem un paràmetre per apuntar a la SAP productiva. Si normalitzem el
-   `discount`, és el mateix dia i coordinat.
+   Aquesta part té data límit de debò. Els camps amb els codis de KAIS han d'estar creats i omplerts
+   **abans** del 2 de novembre, no el mateix dia: si el primer dia us enviem els codis de SAP,
+   vosaltres els ingeriu com a clients nous i desfer-ho després costa molt més que fer-ho bé
+   d'entrada. Per això et demano la llista de codis com abans millor.
+
+2. **El 2 de novembre** canviem un paràmetre per apuntar a la SAP productiva. Si normalitzem el
+   `discount`, és el mateix dia i coordinat: tu treus el `1 - discount` i nosaltres comencem a
+   enviar-te el percentatge de debò.
+3. **Els primers dies** mirem junts que les xifres que van sortint siguin coherents. Aquí sí que et
+   demanaré que hi posis ull.
 4. Si algun check crític falla, la publicació s'avorta i les taules es queden amb les dades del dia
    anterior. Mai veureu dades a mitges.
 
-**Un avís sobre l'històric d'albarans**: a la SAP productiva no hi haurà els albarans anteriors al
-cutover, així que `IntercanviSAP` només portarà dades a partir d'aquell dia. Com que em dius que
+**Un avís sobre l'històric d'albarans**: a la SAP productiva no hi haurà els albarans anteriors al 2
+de novembre, així que `IntercanviSAP` només portarà dades a partir d'aquell dia. Com que em dius que
 conserveu l'històric al vostre motor, encaixa. Però vol dir que el primer dia veureu la taula de
 línies gairebé buida i anirà creixent — que no us espanti.
 
@@ -136,6 +168,16 @@ ohijazo@agrienergia.com
 >
 > **Tanca dos temes oberts**: els codis de zona i de forma de pagament poden canviar sense problema
 > ("tot es reanalitzarà"), o sigui que l'harmonització de `zone_id` que se li havia ofert no cal fer-la.
+>
+> **Sobre les "setmanes de validació en paral·lel"** que se li van prometre al primer correu: no es
+> poden fer. Ell llegeix KAIS, nosaltres llegim SAP test, i SAP test no té operativa (62 línies
+> d'albarà, escrites a mà). I el tall del **2 de novembre de 2026 és sec**: KAIS deixa de rebre dades
+> el mateix dia que SAP arrenca, o sigui que no hi haurà mai un període amb els dos sistemes rebent
+> les mateixes operacions. Una comparació KAIS contra SAP no serà possible ni abans ni després.
+>
+> **Data límit real per als UDFs: 1 de novembre.** No és "al cutover". Si el dia 2 s'envien els codis
+> de SAP en comptes dels de KAIS, Analitza els ingereix com a clients nous i desfer-ho després és
+> molt més car. Això mou la creació i la població dels camps a feina amb data, no a feina pendent.
 >
 > **Correcció al correu anterior**: se li va dir que podia mantenir la seva extracció a les 06:00,
 > però al seu correu del 12/05/2025 diu que la fan a les **05:00**. El nostre procés acaba molt

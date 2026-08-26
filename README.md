@@ -3,7 +3,8 @@
 Aquest projecte substitueix l'origen de dades d'Analitza CM: en comptes de tirar de KAIS,
 ara alimenta les seves taules `est_*` directament des de SAP Business One.
 
-**Estat actual:** ✅ Desplegat i funcionant a **test**. Cutover a productiva previst pel **Novembre 2026**.
+**Estat actual:** ✅ Desplegat i funcionant a **test**. Cutover a productiva el **2 de novembre de 2026**
+(tall sec: KAIS deixa de rebre dades el mateix dia que SAP arrenca).
 
 **Canvi en curs:** l'ETL ha deixat de llegir les taules internes de SAP per SQL directe i ara les
 llegeix per **Service Layer**, com fa `GAPI03_CRM`. Veure [§7](#7-migració-a-service-layer-estat).
@@ -176,8 +177,10 @@ P:\GAPI07_Analitza\
 
 **Bloc D — Migració a Service Layer** → veure [§7](#7-migració-a-service-layer-estat)
 
-**Bloc E — Cutover Novembre 2026**
-- [ ] Setmanes de validació en paral·lel amb KAIS
+**Bloc E — Cutover, 2 de novembre de 2026**
+- [ ] **Data límit 1 de novembre**: UDFs amb els codis de KAIS creats i **poblats**. Si el dia 2
+      s'envien els codis de SAP, Analitza els ingereix com a clients nous
+- [ ] Validació d'estructura i mestres amb l'Adrià (les xifres no es podran comparar amb KAIS)
 - [ ] Canviar `ServiceLayer:CompanyDb` a `DB_FARINERA_PROD` a la config del Worker
 - [ ] Verificar primera execució productiva
 
