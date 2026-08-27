@@ -549,6 +549,36 @@ desajust: `etl_runs.started_at` guarda **UTC** i a l'agost anem a UTC+2.
 
 ## 9. Què queda obert
 
+### Llicenciament de SAP — obert, i més gran del que sembla
+
+**27/08/2026.** Per crear un usuari tècnic de Service Layer cal una llicència, i a
+*Gestió → Llicència → Administració de llicències* **no n'hi ha cap de lliure**:
+
+| Tipus | Disponibles |
+|---|---|
+| Professional User · Limited Financials · Limited Logistics | 0 |
+| **Indirect Access User** · B1iINDIRECT MSS | 0 |
+| Components (`B1i`, `SDK Tools`, `AddOns`, `Workflow`) | ~99.975 |
+
+O sigui que `GAPI07_RO` **no es pot crear** i el pipeline segueix amb `OHijazo`, un usuari nominal
+(veure §Decisions pendents).
+
+**Dues preguntes per al partner, i la segona és la important:**
+
+1. Quina llicència necessita un compte que només llegeix per Service Layer? *Indirect Access User*
+   sembla la figura pensada per a això, però no està confirmat. A la llista d'usuaris hi ha un
+   usuari `B1i` i la llicència de component `B1i` té capacitat de sobres: val la pena mirar què és
+   abans de comprar res.
+2. **Com es llicencia el consum de dades de SAP des d'Analitza CM?** El licenciament indirecte de
+   SAP no va del compte tècnic, va de qui acaba consumint les dades. Aquest projecte porta clients,
+   articles, albarans i cobraments cap a una plataforma externa on hi entren diverses persones
+   d'Agrienergia. Segons com ho miri SAP, aquests usuaris poden comptar.
+
+La segona pregunta **no la genera el Worker, la genera el projecte sencer**, i existia abans de la
+migració a Service Layer. Anar per l'API oficial *mitiga* el risc —era un dels set motius de §3.1—
+però no l'elimina. Val més tenir-ho contestat per escrit ara que descobrir-ho en una auditoria, i
+falten dos mesos per a productiva.
+
 ### Decisions pendents
 
 - **Usuari tècnic de SAP.** Ara la sonda va amb `OHijazo`, un usuari **nominal**, amb contrasenya
