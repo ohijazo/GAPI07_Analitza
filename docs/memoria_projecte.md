@@ -238,7 +238,12 @@ notava perquè no havia canviat res.
 |---|---|---|
 | Windows (`AGRIENERGIA\svc_gapi07`) | Executar la tasca a `AE01SAPRDP` | Sistemes |
 | SAP Service Layer (`GAPI07_RO`) | Llegir SAP. Ara va amb `OHijazo`, nominal | Oscar |
-| SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. Ara va amb `sa` | Oscar — `sql/security/create_worker_user.sql` |
+| SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. Ara va amb `sa` | Oscar — `sql/security/Create-WorkerUser.ps1` |
+
+Per al de SAP hi ha guia a `docs/usuari_tecnic_sap.md`, amb un avís que pot bloquejar: **un usuari
+de SAP consumeix llicència**. Si no n'hi ha cap de lliure, no es pot crear i cal decidir-ho amb el
+partner. Per al de SQL hi ha un llançador que demana la contrasenya interactivament i no l'escriu
+enlloc.
 
 **`AE01SAPRDP` allotja webservices de col·laboradors externs.** Per això la configuració no va a
 variables d'entorn de màquina —qualsevol procés de la màquina les llegiria— sinó a un
