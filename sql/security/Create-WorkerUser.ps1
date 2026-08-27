@@ -91,13 +91,18 @@ DENY CONNECT TO [$Login];
     }
 
     # Comprovacio real, no nomes mirar els GRANT.
+    #
+    # Els SELECT de dins dels TRY assignen a una variable (SELECT TOP 1 @x = 1)
+    # en comptes de retornar files. Si retornessin files, cadascun seria un
+    # conjunt de resultats propi i el lector es quedaria amb el primer en
+    # comptes del SELECT final: era el bug del 27/08/2026.
     $chk = $conn.CreateCommand()
     $chk.CommandText = @"
 USE IntercanviSAP;
-DECLARE @ok_sapraw bit = 0, @ok_dbo_denegat bit = 0;
+DECLARE @ok_sapraw bit = 0, @ok_dbo_denegat bit = 0, @x int;
 EXECUTE AS LOGIN = '$Login';
-BEGIN TRY  SELECT TOP 1 1 FROM sap_raw.OCRD;      SET @ok_sapraw = 1;      END TRY BEGIN CATCH END CATCH
-BEGIN TRY  SELECT TOP 1 1 FROM dbo.est_clients;                            END TRY BEGIN CATCH SET @ok_dbo_denegat = 1; END CATCH
+BEGIN TRY  SELECT TOP 1 @x = 1 FROM sap_raw.OCRD;      SET @ok_sapraw = 1;      END TRY BEGIN CATCH END CATCH
+BEGIN TRY  SELECT TOP 1 @x = 1 FROM dbo.est_clients;                            END TRY BEGIN CATCH SET @ok_dbo_denegat = 1; END CATCH
 REVERT;
 SELECT CAST(@ok_sapraw AS int) AS pot_llegir_sap_raw, CAST(@ok_dbo_denegat AS int) AS te_dbo_denegat;
 "@
