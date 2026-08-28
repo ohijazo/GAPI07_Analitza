@@ -66,4 +66,14 @@ public sealed class SyncOptions
     /// (StockInmPrice tambe dona 0, pero perque esta buit a SAP, no perque ho
     /// haguem decidit). Ho ha de tancar l'Adria.
     public string CostField { get; set; } = "none";
+
+    /// <summary>
+    /// Exportacio de client_locations que ens passa Analitza. Es l'UNIC cens
+    /// dels codis de KAIS que tenim: baseline.est_* a l'entorn de test ja es
+    /// sortida del pipeline apuntat a SAP, i per tant ja porta CardCodes.
+    /// La sonda la fa servir per dir quins clients d'Analitza es perdrien.
+    /// Cal tornar-la a demanar just abans del tall: els clients donats d'alta
+    /// entre l'exportacio i el 2 de novembre no hi son.
+    /// </summary>
+    public string KaisClientExportPath { get; set; } = string.Empty;
 }

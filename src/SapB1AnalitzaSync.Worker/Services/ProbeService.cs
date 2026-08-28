@@ -29,12 +29,15 @@ internal sealed class ProbeService
 {
     private readonly ServiceLayerClient _sl;
     private readonly DatabaseOptions _db;
+    private readonly SyncOptions _sync;
     private readonly ILogger<ProbeService> _log;
 
-    public ProbeService(ServiceLayerClient sl, IOptions<DatabaseOptions> db, ILogger<ProbeService> log)
+    public ProbeService(ServiceLayerClient sl, IOptions<DatabaseOptions> db,
+                        IOptions<SyncOptions> sync, ILogger<ProbeService> log)
     {
         _sl = sl;
         _db = db.Value;
+        _sync = sync.Value;
         _log = log;
     }
 
@@ -57,7 +60,7 @@ internal sealed class ProbeService
 
         var b1Ok = await ProbeAddressesAsync(conn, schema, report, ct).ConfigureAwait(false);
         var b2Ok = await ProbeDeliveryLinesAsync(conn, schema, report, ct).ConfigureAwait(false);
-        await ProbeLegacyCodesAsync(report, ct).ConfigureAwait(false);
+        await ProbeLegacyCodesAsync(conn, schema, report, ct).ConfigureAwait(false);
         await ReportVolumeAsync(conn, schema, report, ct).ConfigureAwait(false);
 
         report.AppendLine("==============================================");
@@ -142,6 +145,15 @@ internal sealed class ProbeService
         if (pct >= 99.9)
         {
             report.AppendLine("VEREDICTE B1: RowNum ES POT fer servir com a LineNum.");
+            // Aixo NO diu que l'id de client quadri amb el que te Analitza. La
+            // referencia d'aqui es baseline/dbo, que a test ja es sortida del
+            // pipeline apuntat a SAP: compara SAP amb SAP. Mesurat contra
+            // l'exportacio real d'Analitza el 28/08/2026, el LineNum de SAP
+            // nomes encertava el 6% dels clients, perque KAIS numerava les
+            // adreces seqüencialment per client. Ho resol etl.vw_client_ship.
+            report.AppendLine("   ATENCIO: aixo compara SAP amb SAP. Que el numero d'adreça");
+            report.AppendLine("   sigui el que Analitza té a l'historic ho diu la comparacio");
+            report.AppendLine("   contra el cens de KAIS, mes avall, no aquest veredicte.");
             return true;
         }
 
@@ -278,7 +290,7 @@ internal sealed class ProbeService
     /// deixa de lligar. Aixo mira si SAP guarda el codi antic en algun UDF.
     /// No dona un veredicte: dona xifres per contestar l'Adria amb dades.
     /// </summary>
-    private async Task ProbeLegacyCodesAsync(StringBuilder report, CancellationToken ct)
+    private async Task ProbeLegacyCodesAsync(SqlConnection conn, string schema, StringBuilder report, CancellationToken ct)
     {
         report.AppendLine();
         report.AppendLine("--- Continuitat d'IDs KAIS -> SAP ---");
@@ -307,24 +319,33 @@ internal sealed class ProbeService
         // al $select respon 400 "Property ... is invalid". La sonda ho ha de dir,
         // no petar: si peta, qui l'executa no sap si el problema es el camp, la
         // xarxa o les credencials.
-        IReadOnlyList<PartnerRow> bps;
+        var customersUrl = ODataQueryBuilder.BuildCustomersWithLinkCode();
         var udfsVisibles = true;
         try
         {
-            bps = await _sl.GetFirstPageAsync<PartnerRow>(
-                ODataQueryBuilder.BuildCustomersWithLinkCode(), ct).ConfigureAwait(false);
+            await _sl.GetFirstPageAsync<PartnerRow>(customersUrl, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {
             udfsVisibles = false;
-            bps = await _sl.GetFirstPageAsync<PartnerRow>(
-                ODataQueryBuilder.BuildCustomersWithLinkCodeFallback(), ct).ConfigureAwait(false);
+            customersUrl = ODataQueryBuilder.BuildCustomersWithLinkCodeFallback();
         }
+
+        // Cens SENCER, no la primera pagina. La cobertura de U_FCCodiKais es una
+        // xifra de la qual depen el cutover: si es mesura sobre una mostra, un
+        // 100% no vol dir res i els clients sense codi apareixen a Analitza com
+        // a clients nous el dia 2 de novembre. Aixo es la mateixa trampa que la
+        // Regla 02 (un $top que sembla el total i no ho es), pero pel cantó del
+        // qui llegeix l'informe.
+        var bps = new List<PartnerRow>();
+        await foreach (var b in _sl.EnumerateAsync<PartnerRow>(customersUrl, ct).ConfigureAwait(false))
+            bps.Add(b);
+
         var withLink = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_SEICodienllac)).ToList();
         var bpWithKais = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCCodiKais)).ToList();
         var bpWithNew  = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCNewCardCode)).ToList();
 
-        report.AppendLine($"CLIENTS (BusinessPartners): {bps.Count} a la mostra");
+        report.AppendLine($"CLIENTS (BusinessPartners): {bps.Count} al cens complet");
 
         if (!udfsVisibles)
         {
@@ -343,10 +364,36 @@ internal sealed class ProbeService
         report.AppendLine($"   U_SEICodienllac informat : {withLink.Count} (camp descartat com a pont)");
 
         if (bpWithKais.Count == 0)
+        {
             report.AppendLine("   >>> El camp existeix pero encara no s'ha poblat cap client. Data limit: 1/11/2026.");
+        }
         else
-            foreach (var b in bpWithKais.Take(5))
-                report.AppendLine($"      CardCode={b.CardCode}  KAIS='{b.U_FCCodiKais}'  {b.CardName}");
+        {
+            foreach (var b in bpWithKais.Take(3))
+                report.AppendLine($"      exemple: CardCode={b.CardCode}  KAIS='{b.U_FCCodiKais}'  {b.CardName}");
+
+            // sp_load_clients emet TOTS els cCustomer, actius i inactius (nomes
+            // en canvia el flag "active"). Un client de baixa sense codi tambe
+            // arriba a Analitza, i tambe hi arriba com a client nou: la llista
+            // de pendents no es pot filtrar per Valid.
+            var sensecodi = bps.Where(b => string.IsNullOrWhiteSpace(b.U_FCCodiKais)).ToList();
+            if (sensecodi.Count == 0)
+            {
+                report.AppendLine("   >>> Cobertura 100% al cens complet. Cap client cauria al CardCode de SAP.");
+            }
+            else
+            {
+                report.AppendLine($"   >>> PENDENTS: {sensecodi.Count} clients sense U_FCCodiKais. " +
+                                  "Cadascun apareixera a Analitza com a client nou.");
+                const int maxLlistats = 40;
+                foreach (var b in sensecodi.Take(maxLlistats))
+                    report.AppendLine($"      CardCode={b.CardCode}  Valid={b.Valid}  {b.CardName}");
+                if (sensecodi.Count > maxLlistats)
+                    report.AppendLine($"      ... i {sensecodi.Count - maxLlistats} mes no llistats.");
+            }
+
+            await CheckKaisCoverageAsync(bpWithKais, report, ct).ConfigureAwait(false);
+        }
 
         var groups = await _sl.GetFirstPageAsync<ItemGroupRow>(
             ODataQueryBuilder.BuildItemGroups(), ct).ConfigureAwait(false);
@@ -361,9 +408,101 @@ internal sealed class ProbeService
         foreach (var g in groups.Take(8))
             report.AppendLine($"      ItmsGrpCod={g.Number}  KAIS='{g.U_FCCodiKais}'  nom='{g.GroupName}'");
 
-        var items = await _sl.GetFirstPageAsync<ItemRow>(
-            ODataQueryBuilder.BuildItems(), ct).ConfigureAwait(false);
-        report.AppendLine($"ARTICLES (Items): mostra de codis: {string.Join(", ", items.Take(10).Select(i => i.ItemCode))}");
+        var items = new List<ItemRow>();
+        await foreach (var i in _sl.EnumerateAsync<ItemRow>(ODataQueryBuilder.BuildItems(), ct).ConfigureAwait(false))
+            items.Add(i);
+        report.AppendLine($"ARTICLES (Items): {items.Count} al cens complet. " +
+                          $"Mostra de codis: {string.Join(", ", items.Take(10).Select(i => i.ItemCode))}");
+
+        // Analitza no fa servir com a "familia" el que SAP en diu ItemGroup: el
+        // que tenen a est_families_productes son categories comercials
+        // ("TRADICIONALS", "KM0", "ECOLOGIQUES"), no classes de materia primera
+        // ("BLAT SUPER FORCA"). El candidat a portar-les es U_SEISubFamCialCat,
+        // que es el que ja alimenta est_atributs_producte.subfamily_description.
+        // Aixo llista els valors reals perque es pugui contrastar amb la seva
+        // llista abans de decidir on ha d'anar cada taxonomia.
+        var subfams = items
+            .GroupBy(i => (i.U_SEISubFamCialCat ?? "").Trim())
+            .OrderByDescending(g => g.Count())
+            .ToList();
+        var sensesubfam = subfams.FirstOrDefault(g => g.Key.Length == 0)?.Count() ?? 0;
+        report.AppendLine($"   U_SEISubFamCialCat: {subfams.Count(g => g.Key.Length > 0)} valors diferents, " +
+                          $"{sensesubfam} articles sense cap");
+        foreach (var g in subfams.Where(g => g.Key.Length > 0))
+            report.AppendLine($"      '{g.Key}'  ({g.Count()} articles)");
+    }
+
+    /// <summary>
+    /// "Quants camps estan plens" no es la pregunta. La pregunta es quants dels
+    /// clients que Analitza té AVUI segueixen existint demà amb el mateix id.
+    /// Un U_FCCodiKais ple pero amb un codi que no es de KAIS compta com a ple i
+    /// trenca l'historic igual; i dos clients de SAP amb el mateix codi fusionen
+    /// dos clients d'Analitza en un.
+    ///
+    /// La referencia NO pot ser baseline.est_clients: a l'entorn de test la
+    /// fotografia es va prendre amb el pipeline antic ja apuntat a SAP, i per
+    /// tant ja porta CardCodes. L'unic cens de KAIS que existeix es l'exportacio
+    /// que ens passa Analitza (client_locations.csv). Cal tornar-la a demanar
+    /// abans del tall: els clients donats d'alta entremig no hi son.
+    /// </summary>
+    private async Task CheckKaisCoverageAsync(
+        List<PartnerRow> bpWithKais, StringBuilder report, CancellationToken ct)
+    {
+        var path = _sync.KaisClientExportPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            report.AppendLine($"   --- Encaix amb el cens de KAIS: OMES (no hi ha '{path}') ---");
+            return;
+        }
+
+        // El codi de client es el tros de id_client_location anterior al guio:
+        // "00201021-000" -> "00201021". Els ship-to no son clients diferents.
+        var kaisCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var linies = 0;
+        foreach (var line in await File.ReadAllLinesAsync(path, ct).ConfigureAwait(false))
+        {
+            if (linies++ == 0) continue;
+            var first = line.Split(',')[0].Trim('"', ' ');
+            var dash = first.IndexOf('-');
+            if (dash > 0) kaisCodes.Add(first[..dash]);
+        }
+
+        var sapCodes = bpWithKais
+            .GroupBy(b => b.U_FCCodiKais!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        report.AppendLine($"   --- Encaix amb el cens de KAIS ({kaisCodes.Count} clients que Analitza té avui) ---");
+
+        var orfes = kaisCodes.Where(k => !sapCodes.Any(g => string.Equals(g.Key, k, StringComparison.OrdinalIgnoreCase)))
+                             .OrderBy(k => k, StringComparer.Ordinal).ToList();
+        var desconeguts = sapCodes.Where(g => !kaisCodes.Contains(g.Key)).ToList();
+        var duplicats = sapCodes.Where(g => g.Count() > 1).ToList();
+
+        report.AppendLine($"   codis de KAIS amb client a SAP     : {Pct(kaisCodes.Count - orfes.Count, kaisCodes.Count)}");
+        report.AppendLine($"   codis a SAP que no son de cap KAIS : {desconeguts.Count}");
+        report.AppendLine($"   codis de KAIS repetits a SAP       : {duplicats.Count}");
+
+        // Un client de KAIS sense cap client de SAP que en porti el codi
+        // desapareix de la sortida. Analitza no veu un error: veu un client que
+        // ha deixat de comprar, i se n'endu l'historic (Regla 04).
+        Llista("clients d'Analitza que es perdrien (cap client de SAP porta el seu codi)",
+               orfes.Select(k => $"      KAIS={k}"));
+        Llista("codis a U_FCCodiKais que no existeixen a KAIS (typo? codi inventat?)",
+               desconeguts.Select(g => $"      KAIS='{g.Key}' -> {string.Join(", ", g.Select(b => b.CardCode))}"));
+        // Dos CardCode amb el mateix codi de KAIS fusionen dos clients
+        // d'Analitza en un de sol, i les vendes d'un s'atribueixen a l'altre.
+        Llista("codis de KAIS duplicats (fusionarien dos clients d'Analitza en un)",
+               duplicats.Select(g => $"      KAIS='{g.Key}' -> {string.Join(", ", g.Select(b => b.CardCode))}"));
+
+        void Llista(string titol, IEnumerable<string> linies)
+        {
+            const int max = 25;
+            var l = linies.ToList();
+            if (l.Count == 0) return;
+            report.AppendLine($"   >>> {l.Count} {titol}:");
+            foreach (var x in l.Take(max)) report.AppendLine(x);
+            if (l.Count > max) report.AppendLine($"      ... i {l.Count - max} mes no llistats.");
+        }
     }
 
     private async Task ReportVolumeAsync(SqlConnection conn, string schema, StringBuilder report, CancellationToken ct)
@@ -403,7 +542,19 @@ internal sealed class ProbeService
     private static bool NearBoth(double? a, double? b) =>
         a is not null && b is not null && Math.Abs(a.Value - b.Value) <= 0.01;
 
-    private static string Pct(int hits, int total) => $"{hits}/{total} ({100.0 * hits / total:F1}%)";
+    /// <summary>
+    /// Amb un decimal, 4689 de 4691 s'arrodoneix a "100,0%" i qui llegeix
+    /// l'informe dona la cobertura per tancada quan encara hi ha dos clients
+    /// que arribarien a Analitza com a clients nous. Mentre en falti un, no es
+    /// pot escriure 100%.
+    /// </summary>
+    private static string Pct(int hits, int total)
+    {
+        if (total == 0) return "0/0 (n/a)";
+        var pct = 100.0 * hits / total;
+        var text = hits < total && pct >= 99.95 ? "<" + 100.0.ToString("F1") : pct.ToString("F1");
+        return $"{hits}/{total} ({text}%)";
+    }
 
     private sealed class LineReference
     {

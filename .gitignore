@@ -43,3 +43,10 @@ skills-lock.json
 
 # Sortida de dotnet publish per desplegar al servidor (regenerable, ~70 MB)
 publish/
+
+# Exportacions que ens passa Analitza: son dades personals de clients reals
+# (nom, adreca, telefon, correu). Fan falta al disc perque la sonda hi compari
+# la continuitat d'IDs (Sync:KaisClientExportPath), pero no han d'entrar a
+# l'historic de git. A mes son una fotografia amb data: se n'ha de demanar una
+# de nova just abans del tall.
+docs/client_locations*.csv
