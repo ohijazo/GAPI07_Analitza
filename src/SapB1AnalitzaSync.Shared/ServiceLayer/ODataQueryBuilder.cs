@@ -34,6 +34,10 @@ public static class ODataQueryBuilder
         "Address", "City", "ZipCode", "Country",
         "SalesPersonCode", "PeymentMethodCode", "Phone1", "EmailAddress",
         "U_SEIPOSBC", "U_SEISEGH1", "U_SEISEGH2", "UpdateDate",
+        // Continuitat amb KAIS (Regla 04): el codi antic mana sobre el CardCode
+        // a l'hora d'emetre id_client_location, i U_FCNewCardCode porta el
+        // successor quan un client canvia de rao social.
+        "U_FCCodiKais", "U_FCNewCardCode",
     };
 
     public static readonly string[] ItemFields =
@@ -88,7 +92,7 @@ public static class ODataQueryBuilder
     public static string BuildSalesPersons()
     {
         var q = new QueryStringBuilder();
-        q.Append("$select", "SalesEmployeeCode,SalesEmployeeName");
+        q.Append("$select", "SalesEmployeeCode,SalesEmployeeName,U_FCCodiKais");
         q.Append("$orderby", "SalesEmployeeCode");
         return "SalesPersons?" + q;
     }
@@ -119,7 +123,7 @@ public static class ODataQueryBuilder
     public static string BuildCustomersWithLinkCode()
     {
         var q = new QueryStringBuilder();
-        q.Append("$select", "CardCode,CardName,U_SEICodienllac,U_FCCodiKais,U_FCNewCardCode");
+        q.Append("$select", "CardCode,CardName,Valid,U_SEICodienllac,U_FCCodiKais,U_FCNewCardCode");
         q.Append("$filter", "CardType eq 'cCustomer'");
         q.Append("$orderby", "CardCode");
         return "BusinessPartners?" + q;
@@ -133,7 +137,7 @@ public static class ODataQueryBuilder
     public static string BuildCustomersWithLinkCodeFallback()
     {
         var q = new QueryStringBuilder();
-        q.Append("$select", "CardCode,CardName,U_SEICodienllac");
+        q.Append("$select", "CardCode,CardName,Valid,U_SEICodienllac");
         q.Append("$filter", "CardType eq 'cCustomer'");
         q.Append("$orderby", "CardCode");
         return "BusinessPartners?" + q;

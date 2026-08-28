@@ -12,9 +12,13 @@
        (DocEntry màx ~10⁷, LineNum màx <100 → int fits, ids únics)
      - invoices_id = LEFT(DocNum, 13)  (varchar(13), sense prefix)
      - date        = datetime (KAIS usa datetime, no date)
-     - client_locations_id = CardCode + '-' + LEFT(ShipToCode, 3)
+     - client_locations_id = etl.vw_client_code + '-' + LEFT(ShipToCode, 3)
+       (= COALESCE(U_FCCodiKais, CardCode): els ids que veu Analitza són els de
+       KAIS, no els CardCode de SAP — Regla 04. Mateixa vista que sp_load_clients)
      - **discount = multiplicador** (1.00 = no desc, 0.90 = 10% desc)
        Fórmula: (1 - disc_line) * (1 - disc_header)
+       decimal(9,6): amb decimal(5,2) un 3,33% quedava 0,97 i el check
+       formula_break saltava contra un net_amount de precisió completa
      - net_amount = quantity * product_price * discount
      - signe negatiu per Returns (RDN) i Credit Memos (RIN)
      - series = últims 2 dígits del codi de sèrie SAP (varchar(2))
@@ -123,8 +127,8 @@ BEGIN
             CAST(100000000 + l.DocEntry * 100 + l.LineNum AS int)                          AS id_invoice_line,
             LEFT(CAST(h.DocNum AS varchar(13)), 13)                                        AS invoices_id,
             CAST(h.DocDate AS datetime)                                                    AS [date],
-            LEFT(RTRIM(h.CardCode) + '-' +
-                 RIGHT('000' + CAST(COALESCE(ship.LineNum, fs.min_line, 0) AS varchar(10)), 3), 13)   AS client_locations_id,
+            LEFT(COALESCE(cc.client_code, RTRIM(h.CardCode)) + '-' +
+                 RIGHT('000' + CAST(COALESCE(ship.ship_no, 0) AS varchar(10)), 3), 13)   AS client_locations_id,
             LEFT(l.ItemCode, 16)                                                           AS products_id,
             CAST(ISNULL(l.PriceBefDi, 0) AS decimal(16,6))                                 AS product_price,
             CAST(ISNULL(l.StockPrice, 0) AS decimal(16,6))                                 AS product_cost,
@@ -145,19 +149,24 @@ BEGIN
                                AND (h.DocTotal - h.VatSum + h.DiscSum) > 0
                                THEN h.DiscSum / (h.DocTotal - h.VatSum + h.DiscSum)
                           ELSE 0 END)
-                AS decimal(5, 2))                                                          AS discount,
+                AS decimal(9, 6))                                                          AS discount,
             CAST(l.Quantity AS decimal(11, 3))                                              AS quantity,
             RIGHT('00' + CAST(ISNULL(h.Series, 0) AS varchar(10)), 2)                      AS series,
             CAST(ISNULL(h.Comments, '') AS varchar(max))                                   AS observations
         FROM   sap_raw.ODLN h
         INNER JOIN sap_raw.DLN1 l ON l.DocEntry = h.DocEntry
-        LEFT JOIN sap_raw.CRD1 ship
+        /* ship_no, no LineNum: la meitat dreta de id_client_location és el
+           número seqüencial d'adreça que feia servir KAIS. Si el ShipToCode del
+           document no lliga amb cap adreça, cau a 0, que és la primera del
+           client (o la fila genèrica si no en té cap). */
+        LEFT JOIN etl.vw_client_ship ship
                ON ship.CardCode  = h.CardCode
-              AND ship.AdresType = 'S'
               AND ship.[Address] = h.ShipToCode
-        LEFT JOIN (SELECT CardCode, MIN(LineNum) AS min_line
-                   FROM   sap_raw.CRD1 WHERE AdresType = 'S' GROUP BY CardCode) fs
-               ON fs.CardCode = h.CardCode
+        /* LEFT, no INNER: un document d'un CardCode que no sigui al mirall
+           (no és cCustomer, o encara no s'ha sincronitzat) ha de seguir sortint
+           amb el codi de SAP, no desaparèixer en silenci. */
+        LEFT JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = h.CardCode
         WHERE  l.LineType <> 'T'
           AND  l.ItemCode IS NOT NULL
           AND  (@full_mode = 1 OR h.DocDate >= @cutoff OR h.UpdateDate >= @cutoff)
@@ -169,8 +178,8 @@ BEGIN
             CAST(200000000 + l.DocEntry * 100 + l.LineNum AS int),
             LEFT(CAST(h.DocNum AS varchar(13)), 13),
             CAST(h.DocDate AS datetime),
-            LEFT(RTRIM(h.CardCode) + '-' +
-                 RIGHT('000' + CAST(COALESCE(ship.LineNum, fs.min_line, 0) AS varchar(10)), 3), 13),
+            LEFT(COALESCE(cc.client_code, RTRIM(h.CardCode)) + '-' +
+                 RIGHT('000' + CAST(COALESCE(ship.ship_no, 0) AS varchar(10)), 3), 13),
             LEFT(l.ItemCode, 16),
             CAST(ISNULL(l.PriceBefDi, 0) AS decimal(16,6)),
             CAST(ISNULL(l.StockPrice, 0) AS decimal(16,6)),
@@ -191,19 +200,24 @@ BEGIN
                                AND (h.DocTotal - h.VatSum + h.DiscSum) > 0
                                THEN h.DiscSum / (h.DocTotal - h.VatSum + h.DiscSum)
                           ELSE 0 END)
-                AS decimal(5, 2)),
+                AS decimal(9, 6)),
             CAST(-1 * l.Quantity AS decimal(11, 3)),
             RIGHT('00' + CAST(ISNULL(h.Series, 0) AS varchar(10)), 2),
             CAST(ISNULL(h.Comments, '') AS varchar(max))
         FROM   sap_raw.ORDN h
         INNER JOIN sap_raw.RDN1 l ON l.DocEntry = h.DocEntry
-        LEFT JOIN sap_raw.CRD1 ship
+        /* ship_no, no LineNum: la meitat dreta de id_client_location és el
+           número seqüencial d'adreça que feia servir KAIS. Si el ShipToCode del
+           document no lliga amb cap adreça, cau a 0, que és la primera del
+           client (o la fila genèrica si no en té cap). */
+        LEFT JOIN etl.vw_client_ship ship
                ON ship.CardCode  = h.CardCode
-              AND ship.AdresType = 'S'
               AND ship.[Address] = h.ShipToCode
-        LEFT JOIN (SELECT CardCode, MIN(LineNum) AS min_line
-                   FROM   sap_raw.CRD1 WHERE AdresType = 'S' GROUP BY CardCode) fs
-               ON fs.CardCode = h.CardCode
+        /* LEFT, no INNER: un document d'un CardCode que no sigui al mirall
+           (no és cCustomer, o encara no s'ha sincronitzat) ha de seguir sortint
+           amb el codi de SAP, no desaparèixer en silenci. */
+        LEFT JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = h.CardCode
         WHERE  l.LineType <> 'T'
           AND  l.ItemCode IS NOT NULL
           AND  (@full_mode = 1 OR h.DocDate >= @cutoff OR h.UpdateDate >= @cutoff)
@@ -215,8 +229,8 @@ BEGIN
             CAST(300000000 + l.DocEntry * 100 + l.LineNum AS int),
             LEFT(CAST(h.DocNum AS varchar(13)), 13),
             CAST(h.DocDate AS datetime),
-            LEFT(RTRIM(h.CardCode) + '-' +
-                 RIGHT('000' + CAST(COALESCE(ship.LineNum, fs.min_line, 0) AS varchar(10)), 3), 13),
+            LEFT(COALESCE(cc.client_code, RTRIM(h.CardCode)) + '-' +
+                 RIGHT('000' + CAST(COALESCE(ship.ship_no, 0) AS varchar(10)), 3), 13),
             LEFT(l.ItemCode, 16),
             CAST(ISNULL(l.PriceBefDi, 0) AS decimal(16,6)),
             CAST(ISNULL(l.StockPrice, 0) AS decimal(16,6)),
@@ -237,19 +251,24 @@ BEGIN
                                AND (h.DocTotal - h.VatSum + h.DiscSum) > 0
                                THEN h.DiscSum / (h.DocTotal - h.VatSum + h.DiscSum)
                           ELSE 0 END)
-                AS decimal(5, 2)),
+                AS decimal(9, 6)),
             CAST(-1 * l.Quantity AS decimal(11, 3)),
             RIGHT('00' + CAST(ISNULL(h.Series, 0) AS varchar(10)), 2),
             CAST(ISNULL(h.Comments, '') AS varchar(max))
         FROM   sap_raw.ORIN h
         INNER JOIN sap_raw.RIN1 l ON l.DocEntry = h.DocEntry
-        LEFT JOIN sap_raw.CRD1 ship
+        /* ship_no, no LineNum: la meitat dreta de id_client_location és el
+           número seqüencial d'adreça que feia servir KAIS. Si el ShipToCode del
+           document no lliga amb cap adreça, cau a 0, que és la primera del
+           client (o la fila genèrica si no en té cap). */
+        LEFT JOIN etl.vw_client_ship ship
                ON ship.CardCode  = h.CardCode
-              AND ship.AdresType = 'S'
               AND ship.[Address] = h.ShipToCode
-        LEFT JOIN (SELECT CardCode, MIN(LineNum) AS min_line
-                   FROM   sap_raw.CRD1 WHERE AdresType = 'S' GROUP BY CardCode) fs
-               ON fs.CardCode = h.CardCode
+        /* LEFT, no INNER: un document d'un CardCode que no sigui al mirall
+           (no és cCustomer, o encara no s'ha sincronitzat) ha de seguir sortint
+           amb el codi de SAP, no desaparèixer en silenci. */
+        LEFT JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = h.CardCode
         WHERE  l.LineType <> 'T'
           AND  l.ItemCode IS NOT NULL
           AND  (@full_mode = 1 OR h.DocDate >= @cutoff OR h.UpdateDate >= @cutoff)

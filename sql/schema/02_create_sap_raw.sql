@@ -60,6 +60,17 @@ CREATE TABLE sap_raw.OCRD (
 );
 GO
 
+/* Els UDFs de continuitat amb KAIS es van crear a SAP el 26/08/2026, despres
+   que aquest DDL ja estigues desplegat. El CREATE TABLE de dalt no s'executa
+   sobre una BD que ja te la taula, aixi que les columnes noves han d'entrar
+   per ALTER i cadascuna amb la seva guarda. */
+IF COL_LENGTH('sap_raw.OCRD', 'U_FCCodiKais') IS NULL
+    ALTER TABLE sap_raw.OCRD ADD U_FCCodiKais nvarchar(50) NULL;   -- codi del client a KAIS
+GO
+IF COL_LENGTH('sap_raw.OCRD', 'U_FCNewCardCode') IS NULL
+    ALTER TABLE sap_raw.OCRD ADD U_FCNewCardCode nvarchar(50) NULL; -- CardCode del successor
+GO
+
 /* CRD1 — adreces del BP.  SL: BusinessPartners?$expand=BPAddresses
    LineNum ve de BPAddress.RowNum. ATENCIÓ: id_client_location = CardCode-LineNum
    és el contracte amb Analitza (Regla 04); la Fase 0 verifica que RowNum i
@@ -126,6 +137,12 @@ CREATE TABLE sap_raw.OSLP (
     _synced_at  datetime2(3)  NOT NULL CONSTRAINT DF_sap_raw_OSLP_synced DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_sap_raw_OSLP PRIMARY KEY CLUSTERED (SlpCode)
 );
+GO
+
+/* A OSLP el camp ja existia a SAP abans que el projecte comences (48 de 49
+   comercials el porten informat); el que faltava era baixar-lo al mirall. */
+IF COL_LENGTH('sap_raw.OSLP', 'U_FCCodiKais') IS NULL
+    ALTER TABLE sap_raw.OSLP ADD U_FCCodiKais nvarchar(50) NULL;   -- codi del comercial a KAIS
 GO
 
 /* OPYM — formes de pagament.  SL: WizardPaymentMethods (PaymentMethodCode, Description) */

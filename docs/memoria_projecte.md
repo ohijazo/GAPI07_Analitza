@@ -446,6 +446,110 @@ afegir-los a `sap_raw`, i canviar
 regla **`id = COALESCE(U_FCCodiKais, <codi SAP>)`**: qui ve de KAIS manté el seu codi, qui és nou
 porta el de SAP. Els dos formats no es poden trepitjar (8 dígits vs `C` + 6).
 
+**Estat a 28\08\2026 — `OCRD.U_FCCodiKais` poblat.** Mesurat amb `--probe` contra `DB_FARINERA_TEST`:
+
+| Mestre | Cobertura | Pendent |
+|---|---|---|
+| `OCRD` (clients) | **4.689 de 4.691** | `01` (*test1*) i `C001024` (*MASTER FURROW, S.L. DIRECCIO*) |
+| `OSLP` (comercials) | 48 de 49 | el que falta és `SlpCode = -1`, el pseudo-comercial "cap"; l'ETL ja el mapeja a `'000'` |
+| `OITB` (famílies) | **0 de 110** | tot |
+| `OCRD.U_FCNewCardCode` | 0 | correcte: només s'omple als canvis de raó social |
+
+El format confirma la regla que als 500 primers no es veia: `C001025 ↔ '00001025'`, o sigui
+`CardCode = 'C' + els 6 últims dígits del codi de KAIS`. Però **no s'ha de derivar per fórmula**,
+sinó llegir el camp: és exactament el que es va donar per bo el 11\08 i era fals.
+
+Dues coses que aquesta mesura va destapar de la sonda mateixa, i que s'han corregit:
+
+- La cobertura de clients es calculava sobre **la primera pàgina** (500 de 4.691) i es presentava
+  sense dir-ho. Un `99,6%` sobre una mostra no diu res del cens; ara `--probe` pagina el
+  `BusinessPartners` sencer i llista els `CardCode` que queden buits.
+- `4689/4691` s'imprimia com a **`100,0%`**. Amb un decimal, dos clients desapareixen de l'informe i
+  qui el llegeix dóna la població per tancada. Ara, mentre en falti un, s'escriu `<100,0%`.
+
+La llista de pendents **no es pot filtrar pels clients actius**: `sp_load_clients` emet tots els
+`cCustomer`, i als de baixa només els canvia el flag `active`. Un client donat de baixa sense codi
+també arriba a Analitza, i també hi arriba com a client nou.
+
+**Encaix contra el cens de KAIS (28\08\2026).** «Quants camps estan plens» no és la pregunta: un
+`U_FCCodiKais` ple amb un codi que no és de KAIS compta com a ple i trenca l'històric igual, i dos
+clients de SAP amb el mateix codi fusionarien dos clients d'Analitza en un. La referència **no pot
+ser `baseline.est_clients`**: a l'entorn de test la fotografia es va prendre amb el pipeline antic ja
+apuntat a SAP, i per tant ja porta `CardCode`s (`C001025-000`). L'únic cens de KAIS que existeix és
+l'exportació que ens passa Analitza. La sonda la llegeix de `Sync:KaisClientExportPath`
+(`docs/client_locations.csv`).
+
+Contra l'exportació del 27\08\2026 (4.702 clients):
+
+| | |
+|---|---|
+| codis de KAIS amb client a SAP | **4.689 de 4.702** |
+| codis a `U_FCCodiKais` que no són de cap KAIS | **0** — la població és neta, cap codi inventat |
+| codis de KAIS duplicats a SAP | **0** — cap fusió de dos clients en un |
+| clients d'Analitza que es perdrien | **13**, 12 d'ells actius |
+
+Els 13: `00241441` FORN DE PA L'ESTANYOL · `00251299` PAN DE 2AM · `00271547` EL PASTADOR DE VIC ·
+`00281362` THOMAS SOURDOUGH BAKERY · `00301196` TASQUE MUÑOZ, SERGI · `00321868` PA I DOLÇOS VALERO ·
+`00321869` CASTAÑ IBAÑEZ GLOBAL · `00321870` MOLT OBRADOR DE PA · `00321871` HUGUET SIURO ·
+`00331163` KONAMA KARIKARI · `00432081` LITTLE INDIA FOODS MARBELLA (amb 6 ship-to) ·
+`00432082` AORAA BAKERY · `00440004` RIGO TRADING (inactiu).
+
+**Avís sobre aquesta xifra:** està mesurada contra `DB_FARINERA_TEST`. Part dels 13 poden existir a
+la productiva i ser només un desfasament de la còpia de test. S'ha de tornar a mesurar contra
+`DB_FARINERA_PROD` abans de donar cap d'aquests casos per bo.
+
+### 6.5 El número d'adreça tampoc era el de KAIS (28\08\2026)
+
+`id_client_location` té dues meitats i el `U_FCCodiKais` només arregla l'esquerra. En comparar la
+sortida sencera contra l'exportació d'Analitza va sortir que **la dreta també estava trencada**:
+
+| | clients que quadren |
+|---|---|
+| `CRD1.LineNum` (el que hi havia) | **283 de 4.689** (6%) |
+| renumerant 0,1,2… per client | **4.647 de 4.689** (99,1%) |
+
+KAIS numerava les adreces de cada client **seqüencialment des de 000**. El `LineNum` de SAP és un
+número de fila intern i comença on li toca: `00251182` té les adreces a `000, 006, 014`, i a Analitza
+són `000, 001, 002`.
+
+**Per què no es va veure a la Fase 0.** La sonda va donar 534/534 coincidències, però contra
+`baseline.est_clients`, que a l'entorn de test ja és sortida del pipeline apuntat a SAP. Comparava
+SAP amb SAP: el que demostrava és que `BPAddress.RowNum == CRD1.LineNum`, no que cap dels dos fos el
+número que Analitza té a l'històric. És **el mateix error** que prendre `baseline` com a cens de
+KAIS, i les dues vegades el símptoma va ser un 100% tranquil·litzador. El veredicte B1 de la sonda
+ara ho diu explícitament.
+
+Resolt amb `etl.vw_client_ship` (`ROW_NUMBER() OVER (PARTITION BY CardCode ORDER BY LineNum) - 1`).
+
+**El que costa:** si algú esborra una adreça de ship-to a SAP, totes les posteriors del mateix client
+es renumeren, i per a Analitza això són ubicacions que desapareixen i ubicacions noves amb l'històric
+buit. `vanished_ids` ho detecta l'endemà, però ho detecta, no ho evita. La solució estable és
+congelar el número per (client, adreça) en una taula al tall i fer servir la seqüència només per a
+les adreces noves. **Pendent de decidir**; mentrestant això és correcte per al 99,1% i el que hi
+havia ho era per al 6%.
+
+### 6.6 Resultat de la implementació del COALESCE (28\08\2026)
+
+Desplegat a `IntercanviSAP` i executat `sp_run_all @SkipSwap=1, @ForceFullLines=1`. Comparant
+`staging.est_clients` amb els 5.684 `id_client_location` de l'exportació d'Analitza:
+
+| | |
+|---|---|
+| es conserven — l'històric lliga | **5.621 de 5.684 (98,9%)** |
+| es perdrien | 63 |
+| ubicacions noves | 30 |
+
+Abans del canvi de numeració n'hi havia **973** de coincidents.
+
+Dels 63: **18** són dels 13 clients que no existeixen a SAP (§6.4), i els **45** restants són clients
+que a SAP tenen menys adreces de ship-to que a KAIS i perden la cua (gairebé tots, una sola adreça).
+No és un error de fórmula, és desfasament de dades entre els dos sistemes — i mesurat contra
+`DB_FARINERA_TEST`, o sigui que una part pot ser només que la còpia de test va endarrerida.
+
+L'únic warning CRITICAL que queda és `vanished_ids`, i és correcte que salti: els identificadors
+canvien en massa, que és precisament el que aquest check vigila. Al cutover cal apujar
+`cfg.settings.ID_DROP_MAX` expressament i tornar-lo a baixar l'endemà (Regla 04).
+
 **El `new_code` canvia de semàntica.** L'esborrany del 25/08 proposava
 `new_code = COALESCE(U_FCNewCardCode, U_FCKaisCode)`. **Era erroni**: tenia sentit quan
 l'identificador era el codi de SAP i el `new_code` feia de pont cap a KAIS, però si el codi de KAIS
@@ -462,7 +566,12 @@ Aquest risc el cobreix el check **`vanished_ids`**, implementat el 26/08/2026: a
 identificador que ahir hi era avui no hi és. Protegeix el contracte cada nit sense dependre que
 ningú se'n recordi.
 
-**Res d'això no està implementat**: primer cal la confirmació de l'Adrià.
+**El camp ja es pobla, però encara no el llegeix ningú.** A 28\08\2026 `U_FCCodiKais` no existeix ni
+a `sap_raw` ni a cap SP: el Worker només el demana des de la sonda. Mentre l'emissió no s'implementi,
+la població del camp no canvia res del que veu Analitza. Falta: afegir les columnes a `sap_raw.OCRD`,
+`sap_raw.OITB` i `sap_raw.OSLP`, que el Worker les escrigui, i el `COALESCE` a `sp_load_clients`,
+`sp_load_client_attributes` (que ha de fer servir la **mateixa** fórmula d'`id_client_location`),
+`sp_load_salesmen` i `sp_load_product_categories`. Continua pendent de la confirmació de l'Adrià.
 
 ### 6.5 Volum
 

@@ -18,8 +18,13 @@
 PRINT '==== 1/4  Schema =================================';
 :r $(ROOT)\schema\01_create_database.sql
 :r $(ROOT)\schema\02_create_sap_raw.sql
+/* Posa al dia una BD ja desplegada: 01 no es pot reexecutar sobre la
+   productiva perque fa DROP de les est_*. */
+:r $(ROOT)\schema\04_migracions.sql
 
 PRINT '==== 2/4  Stored procedures =====================';
+/* Les vistes primer: els SP de sota hi fan JOIN. */
+:r $(ROOT)\procs\etl_vw_kais_codes.sql
 :r $(ROOT)\procs\etl_sp_load_product_categories.sql
 :r $(ROOT)\procs\etl_sp_load_salesmen.sql
 :r $(ROOT)\procs\etl_sp_load_clients.sql

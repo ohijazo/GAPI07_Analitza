@@ -4,8 +4,10 @@
             (mirall de SAP omplert pel Worker via Service Layer)
    Destino: staging.est_atributs_client
    ID compat: mateixa fórmula id_client_location que sp_load_clients
-              (CardCode-000 genèrica, CardCode-<LineNum> per ship-tos).
-              Si es toca una, s'ha de tocar l'altra (Regla 04).
+              (<codi>-000 genèrica, <codi>-<LineNum> per ship-tos), on el codi
+              surt de etl.vw_client_code = COALESCE(U_FCCodiKais, CardCode).
+              Les dues han de coincidir EXACTAMENT (Regla 04): per això surten
+              de la mateixa vista i no d'una expressió copiada.
    ========================================================================= */
 USE IntercanviSAP;
 GO
@@ -35,7 +37,7 @@ BEGIN
         /* Fila genèrica: només si NO té ship-tos. Sense CRD1, no hi ha zona
            → per defecte "SENSE ZONA" via cfg.zone_code_mapping. */
         SELECT
-            LEFT(RTRIM(c.CardCode) + '-000', 13)                                    AS client_locations_id,
+            LEFT(cc.client_code + '-000', 13)                                       AS client_locations_id,
             ISNULL(zm.zone_id, '0000')                                              AS zone_id,
             ISNULL(zm.zone_description, N'SENSE ZONA')                              AS zone_description,
             LEFT(RTRIM(ISNULL(c.PymCode, '')), 3)                                   AS payment_method,
@@ -44,6 +46,8 @@ BEGIN
             LEFT(NULLIF(RTRIM(ISNULL(c.U_SEISEGH1, '')), ''), 250)                  AS segmentation_use_1,
             LEFT(NULLIF(RTRIM(ISNULL(c.U_SEISEGH2, '')), ''), 250)                  AS segmentation_use_2
         FROM   sap_raw.OCRD AS c
+        INNER JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = c.CardCode
         LEFT JOIN sap_raw.OPYM AS pm
                ON pm.PayMethCod = c.PymCode
         LEFT JOIN cfg.zone_code_mapping zm
@@ -59,7 +63,7 @@ BEGIN
         /* Fila per cada ship-to. Zona surt de CRD1.U_SEIZONAC via
            cfg.zone_code_mapping. Casos NULL o buits mapen a "SENSE ZONA". */
         SELECT
-            LEFT(RTRIM(c.CardCode) + '-' + RIGHT('000' + CAST(a.LineNum AS varchar(10)), 3), 13)
+            LEFT(cc.client_code + '-' + RIGHT('000' + CAST(sh.ship_no AS varchar(10)), 3), 13)
                                                                                     AS client_locations_id,
             ISNULL(zm.zone_id, '0000')                                              AS zone_id,
             ISNULL(zm.zone_description, N'SENSE ZONA')                              AS zone_description,
@@ -72,6 +76,10 @@ BEGIN
         INNER JOIN sap_raw.CRD1 AS a
                ON a.CardCode  = c.CardCode
               AND a.AdresType = 'S'
+        INNER JOIN etl.vw_client_ship AS sh
+               ON sh.CardCode = a.CardCode AND sh.LineNum = a.LineNum
+        INNER JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = c.CardCode
         LEFT JOIN sap_raw.OPYM AS pm
                ON pm.PayMethCod = c.PymCode
         LEFT JOIN cfg.zone_code_mapping zm

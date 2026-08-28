@@ -3,11 +3,16 @@
    Origen : sap_raw.OSLP   (mirall de SAP omplert pel Worker via Service Layer)
    Destino: staging.est_agents
    Mapping:
-     id_salesman  <- LPAD(SlpCode, 3)     varchar(3)   -- KAIS: "000", "006", "100"
-     name         <- SlpName              varchar(35)
+     id_salesman  <- etl.vw_salesman_code  varchar(3)   -- KAIS: "000", "006", "100"
+     name         <- SlpName               varchar(35)
    Nota: SlpCode = -1 ("Sin agente") és preservat (SAP l'usa per fallback).
-   Format LPAD amb 3 chars: SlpCode -1 → "-1 " (2 chars + espai) ho convertim
-   a "000" per compatibilitat amb KAIS.
+
+   ATENCIÓ: l'id NO és el SlpCode. Els codis de comercial NO es van preservar a
+   la migració a SAP (SlpCode 2 era '006' a KAIS), i Analitza té l'històric
+   penjat dels de KAIS. La regla és COALESCE(U_FCCodiKais, LPAD(SlpCode,3)) i
+   viu a etl.vw_salesman_code, que és el mateix que fa servir sp_load_clients
+   per omplir est_clients.salesmen_id: si les dues divergeixen, els clients
+   apunten a comercials que no existeixen (Regla 04).
    ========================================================================= */
 USE IntercanviSAP;
 GO
@@ -29,12 +34,18 @@ BEGIN
     BEGIN TRY
         TRUNCATE TABLE staging.est_agents;
 
+        /* Dos SlpCode poden acabar al mateix id_salesman: el -1 ("sense agent")
+           mapeja a '000' i a SAP hi pot haver un comercial amb U_FCCodiKais
+           '000'. est_agents té clau primària per id_salesman, així que cal
+           agrupar-hi; sense això l'INSERT peta i el run queda BLOCKED. */
         INSERT INTO staging.est_agents (id_salesman, [name])
-        SELECT  CASE WHEN SlpCode < 0 THEN '000'
-                     ELSE RIGHT('000' + CAST(SlpCode AS varchar(10)), 3) END,
-                LEFT(ISNULL(SlpName, ''), 35)
-        FROM    sap_raw.OSLP
-        WHERE   SlpCode IS NOT NULL;
+        SELECT  sc.id_salesman,
+                LEFT(ISNULL(MIN(s.SlpName), ''), 35)
+        FROM    sap_raw.OSLP AS s
+        INNER JOIN etl.vw_salesman_code AS sc
+                ON sc.SlpCode = s.SlpCode
+        WHERE   s.SlpCode IS NOT NULL
+        GROUP BY sc.id_salesman;
         SET @rows_out = @@ROWCOUNT;
 
         SELECT @rows_in = COUNT_BIG(*) FROM sap_raw.OSLP;

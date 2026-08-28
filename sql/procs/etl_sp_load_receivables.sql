@@ -6,7 +6,8 @@
    Mapping KAIS:
      id_client_location_receivable  uniqueidentifier  — derivat de DocEntry
                                     determinísticament (HASHBYTES MD5 → 16 bytes)
-     client_locations_id            varchar(13)       CardCode + '-' + LEFT(ShipToCode,3)
+     client_locations_id            varchar(13)       etl.vw_client_code + '-' + LEFT(ShipToCode,3)
+                                    (= COALESCE(U_FCCodiKais, CardCode); Regla 04)
      net_amount                     decimal(16,6)     DocTotal - PaidToDate
      issue_date                     datetime          DocDate
      due_date                       datetime          DocDueDate
@@ -37,22 +38,21 @@ BEGIN
              issue_date, due_date, payment_method)
         SELECT
             CAST(HASHBYTES('MD5', 'OINV-' + CAST(h.DocEntry AS varchar(20))) AS uniqueidentifier)  AS id_client_location_receivable,
-            LEFT(RTRIM(h.CardCode) + '-' +
-                 RIGHT('000' + CAST(COALESCE(ship.LineNum, fs.min_line, 0) AS varchar(10)), 3), 13) AS client_locations_id,
+            LEFT(COALESCE(cc.client_code, RTRIM(h.CardCode)) + '-' +
+                 RIGHT('000' + CAST(COALESCE(ship.ship_no, 0) AS varchar(10)), 3), 13) AS client_locations_id,
             CAST((h.DocTotal - h.PaidToDate) AS decimal(16,6))                                      AS net_amount,
             CAST(h.DocDate    AS datetime)                                                          AS issue_date,
             CAST(h.DocDueDate AS datetime)                                                          AS due_date,
             LEFT(RTRIM(ISNULL(h.PeyMethod, '')), 3)                                                 AS payment_method
         FROM    sap_raw.OINV h
-        LEFT JOIN sap_raw.CRD1 ship
+        /* ship_no, no LineNum: veure la capçalera de etl.vw_client_ship. */
+        LEFT JOIN etl.vw_client_ship ship
                ON ship.CardCode  = h.CardCode
-              AND ship.AdresType = 'S'
               AND ship.[Address] = h.ShipToCode
-        LEFT JOIN (SELECT CardCode, MIN(LineNum) AS min_line
-                   FROM   sap_raw.CRD1
-                   WHERE  AdresType = 'S'
-                   GROUP BY CardCode) fs
-               ON fs.CardCode = h.CardCode
+        /* LEFT, no INNER: una factura d'un CardCode que no sigui al mirall ha
+           de seguir sortint amb el codi de SAP, no desaparèixer en silenci. */
+        LEFT JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = h.CardCode
         WHERE   h.DocStatus = 'O'
           AND   (h.DocTotal - h.PaidToDate) > 0
           AND   h.DocDueDate IS NOT NULL;

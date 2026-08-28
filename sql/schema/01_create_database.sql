@@ -175,6 +175,11 @@ GO
      - decimals amb precisió KAIS
      - **discount és un multiplicador**: 1.00 = no descompte, 0.90 = 10% desc.
        Fórmula: net_amount = quantity * product_price * discount
+       decimal(9,6), no decimal(5,2): amb 2 decimals un 3,33% de descompte
+       s'arrodoneix a 0,97 i la fórmula deixa de quadrar contra un net_amount
+       calculat a precisió completa. Amb les 62 línies de test cap en porta i
+       no es notava; amb descomptes reals el check formula_break saltaria cada
+       nit. Acordat amb Analitza el 27/08/2026.
      - series varchar(2) (codi de sèrie SAP)
      - observations text (obsolet però compatible)
    No hi ha camp 'transaction' — retorns/abonaments es representen amb
@@ -190,7 +195,7 @@ CREATE TABLE dbo.est_linies_albara (
     product_cost        decimal(16,6) NOT NULL,
     product_cost_2      decimal(16,6) NOT NULL,
     net_amount          numeric(38,6) NULL,
-    discount            decimal(5,2)  NULL,       -- 1.00 = 0% desc, 0.90 = 10% desc
+    discount            decimal(9,6)  NULL,       -- 1.00 = 0% desc, 0.90 = 10% desc
     quantity            decimal(11,3) NOT NULL,
     series              varchar(2)    NOT NULL,
     observations        varchar(max)  NOT NULL,   -- KAIS usa 'text' obsolet; varchar(max) equivalent modern
@@ -206,7 +211,7 @@ CREATE TABLE staging.est_linies_albara (
     product_cost        decimal(16,6) NOT NULL,
     product_cost_2      decimal(16,6) NOT NULL,
     net_amount          numeric(38,6) NULL,
-    discount            decimal(5,2)  NULL,
+    discount            decimal(9,6)  NULL,
     quantity            decimal(11,3) NOT NULL,
     series              varchar(2)    NOT NULL,
     observations        varchar(max)  NOT NULL,

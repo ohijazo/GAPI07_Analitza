@@ -4,16 +4,24 @@
             (mirall de SAP omplert pel Worker via Service Layer)
    Destino: staging.est_clients
    Regles:
-     - id_client_location = CardCode + '-' + <ShipToCode>  (varchar(13))
-       - ShipToCode = RIGHT('000' + CRD1.LineNum, 3)  (3 dígits, estable per SAP)
+     - id_client_location = <codi de client> + '-' + <ShipToCode>  (varchar(13))
+       - <codi de client> = etl.vw_client_code = COALESCE(U_FCCodiKais, CardCode)
+       - <ShipToCode> = etl.vw_client_ship.ship_no, NO CRD1.LineNum: KAIS
+         numerava les adreces seqüencialment per client des de 000 (veure la
+         capçalera de la vista)
        - Fila "genèrica" CardCode-000 només si el client NO té cap ship-to a CRD1.
      - active = 1 si validFor='Y' AND (frozenFor IS NULL OR frozenFor='N'), else 0
-     - salesmen_id = RIGHT('000' + SlpCode, 3), amb SlpCode<0 → '000'
+     - salesmen_id = etl.vw_salesman_code (NO el SlpCode: els codis de comercial
+       tampoc es van preservar a la migració)
+     - new_code = el codi EMÈS del successor (U_FCNewCardCode passat per la
+       mateixa vista), o NULL. Analitza hi concatena '-000' pel seu compte.
      - country_code minúscules; overrides via cfg.country_code_overrides
      - payment_method/holidays/comments NO van a est_clients (KAIS format)
 
    ATENCIÓ: id_client_location és el contracte amb Analitza (Regla 04). La
-   fórmula ha de coincidir EXACTAMENT amb la de sp_load_client_attributes.
+   fórmula ha de coincidir EXACTAMENT amb la de sp_load_client_attributes,
+   sp_load_invoice_lines i sp_load_receivables. Per això el codi de client surt
+   d'una vista i no d'una expressió copiada a cada SP.
    ========================================================================= */
 USE IntercanviSAP;
 GO
@@ -41,7 +49,7 @@ BEGIN
 
         /* ---- Fila genèrica per client (CardCode-000) — només si NO té ship-tos ---- */
         SELECT
-            LEFT(RTRIM(c.CardCode) + '-000', 13)                                    AS id_client_location,
+            LEFT(cc.client_code + '-000', 13)                                       AS id_client_location,
             LEFT(ISNULL(c.CardName, ''), 40)                                        AS [name],
             CASE WHEN c.validFor = 'Y' AND (c.frozenFor = 'N' OR c.frozenFor IS NULL)
                  THEN 1 ELSE 0 END                                                  AS active,
@@ -50,15 +58,19 @@ BEGIN
             LEFT(ISNULL(c.ZipCode, ''), 10)                                         AS zip_code,
             LOWER( LEFT( COALESCE( ov.iso2_code, NULLIF(c.Country, ''), 'es' ), 4 ))
                                                                                     AS country_code,
-            LEFT( CASE WHEN c.SlpCode < 0 THEN '000'
-                       ELSE RIGHT('000' + CAST(ISNULL(c.SlpCode, 0) AS varchar(10)), 3) END, 3)
-                                                                                    AS salesmen_id,
-            NULL                                                                    AS new_code,
+            LEFT(ISNULL(sc.id_salesman, '000'), 3)                                  AS salesmen_id,
+            LEFT(succ.client_code, 8)                                               AS new_code,
             LEFT(ISNULL(c.Phone1, ''), 30)                                          AS phone_number,
             LEFT(ISNULL(c.E_Mail, ''), 60)                                          AS email
         FROM   sap_raw.OCRD AS c
+        INNER JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = c.CardCode
         LEFT JOIN cfg.country_code_overrides AS ov
                ON ov.sap_country_code = c.Country
+        LEFT JOIN etl.vw_salesman_code AS sc
+               ON sc.SlpCode = c.SlpCode
+        LEFT JOIN etl.vw_client_code AS succ
+               ON succ.CardCode = NULLIF(LTRIM(RTRIM(c.U_FCNewCardCode)), '')
         WHERE  c.CardType = 'C'
           AND  NOT EXISTS (
                 SELECT 1 FROM sap_raw.CRD1 a
@@ -69,7 +81,7 @@ BEGIN
 
         /* ---- Fila per cada ship-to (CardCode-<LineNum 3-dígits>) ---- */
         SELECT
-            LEFT(RTRIM(c.CardCode) + '-' + RIGHT('000' + CAST(a.LineNum AS varchar(10)), 3), 13)
+            LEFT(cc.client_code + '-' + RIGHT('000' + CAST(sh.ship_no AS varchar(10)), 3), 13)
                                                                                     AS id_client_location,
             LEFT(ISNULL(c.CardName, ''), 40)                                        AS [name],
             CASE WHEN c.validFor = 'Y' AND (c.frozenFor = 'N' OR c.frozenFor IS NULL)
@@ -82,18 +94,24 @@ BEGIN
             LEFT(ISNULL(a.ZipCode, ''), 10)                                         AS zip_code,
             LOWER( LEFT( COALESCE( ov.iso2_code, NULLIF(a.Country, ''), NULLIF(c.Country, ''), 'es' ), 4 ))
                                                                                     AS country_code,
-            LEFT( CASE WHEN c.SlpCode < 0 THEN '000'
-                       ELSE RIGHT('000' + CAST(ISNULL(c.SlpCode, 0) AS varchar(10)), 3) END, 3)
-                                                                                    AS salesmen_id,
-            NULL                                                                    AS new_code,
+            LEFT(ISNULL(sc.id_salesman, '000'), 3)                                  AS salesmen_id,
+            LEFT(succ.client_code, 8)                                               AS new_code,
             LEFT(ISNULL(c.Phone1, ''), 30)                                          AS phone_number,
             LEFT(ISNULL(c.E_Mail, ''), 60)                                          AS email
         FROM   sap_raw.OCRD AS c
         INNER JOIN sap_raw.CRD1 AS a
                ON a.CardCode  = c.CardCode
               AND a.AdresType = 'S'
+        INNER JOIN etl.vw_client_ship AS sh
+               ON sh.CardCode = a.CardCode AND sh.LineNum = a.LineNum
+        INNER JOIN etl.vw_client_code AS cc
+               ON cc.CardCode = c.CardCode
         LEFT JOIN cfg.country_code_overrides AS ov
                ON ov.sap_country_code = a.Country
+        LEFT JOIN etl.vw_salesman_code AS sc
+               ON sc.SlpCode = c.SlpCode
+        LEFT JOIN etl.vw_client_code AS succ
+               ON succ.CardCode = NULLIF(LTRIM(RTRIM(c.U_FCNewCardCode)), '')
         WHERE  c.CardType = 'C';
 
         SET @rows_out = @@ROWCOUNT;

@@ -39,6 +39,8 @@ internal static class MirrorTables
         dt.Columns.Add("U_SEISEGH1", typeof(string));
         dt.Columns.Add("U_SEISEGH2", typeof(string));
         dt.Columns.Add("UpdateDate", typeof(DateTime));
+        dt.Columns.Add("U_FCCodiKais", typeof(string));
+        dt.Columns.Add("U_FCNewCardCode", typeof(string));
         return dt;
     }
 
@@ -59,7 +61,9 @@ internal static class MirrorTables
         Val(r.U_SEIPOSBC),
         Val(r.U_SEISEGH1),
         Val(r.U_SEISEGH2),
-        Val(r.UpdateDate));
+        Val(r.UpdateDate),
+        Val(r.U_FCCodiKais),
+        Val(r.U_FCNewCardCode));
 
     public static DataTable NewCrd1()
     {
@@ -131,11 +135,12 @@ internal static class MirrorTables
         var dt = new DataTable();
         dt.Columns.Add("SlpCode", typeof(short));
         dt.Columns.Add("SlpName", typeof(string));
+        dt.Columns.Add("U_FCCodiKais", typeof(string));
         return dt;
     }
 
     public static void AddOslp(DataTable dt, SalesPersonRow r) => dt.Rows.Add(
-        (short)(r.SalesEmployeeCode ?? 0), Val(r.SalesEmployeeName));
+        (short)(r.SalesEmployeeCode ?? 0), Val(r.SalesEmployeeName), Val(r.U_FCCodiKais));
 
     public static DataTable NewOpym()
     {
