@@ -19,6 +19,12 @@
        Fórmula: (1 - disc_line) * (1 - disc_header)
        decimal(9,6): amb decimal(5,2) un 3,33% quedava 0,97 i el check
        formula_break saltava contra un net_amount de precisió completa
+
+       Aquesta convenció la va heretar KAIS i **està previst canviar-la el dia
+       del cutover**: la guia d'Analitza diu que discount és el percentatge
+       (0.25 = 25%) i ells ho tapen amb un "1 - discount" a les seves SQL. El
+       canvi el mana cfg.settings.DISCOUNT_AS_PERCENT i està desactivat ('0').
+       Veure "LA CONVENCIÓ DEL DISCOUNT" més avall i docs/runbook_cutover.md.
      - net_amount = quantity * product_price * discount
      - signe negatiu per Returns (RDN) i Credit Memos (RIN)
      - series = últims 2 dígits del codi de sèrie SAP (varchar(2))
@@ -26,6 +32,34 @@
    Filtres:
      - LineType <> 'T' (comentaris fora)
      - ItemCode NOT NULL
+
+   LA CONVENCIÓ DEL DISCOUNT
+   -------------------------
+   cfg.settings.DISCOUNT_AS_PERCENT: '0' = multiplicador (el que hi ha avui),
+   '1' = percentatge (el que demana la guia d'Analitza). Es toca **un sol dia**,
+   el del cutover, i coordinadament amb ells: si Analitza no treu el seu
+   "1 - discount" el mateix dia, els imports li surten a zero. És una fallada
+   sorollosa a propòsit, molt millor que una de silenciosa.
+
+   La conversió NO va a les tres branques del UNION ALL. Estaria repetida tres
+   vegades i és exactament el patró que la Regla 04 avisa de no repetir. Va a
+   dos punts, tots dos aquí:
+
+     1. La còpia dbo → staging del mode incremental **desfà** la conversió, de
+        manera que a mig SP tot staging és uniformement un multiplicador. Sense
+        això, les línies que vénen de dbo ja portarien el percentatge i el pas 2
+        els donaria la volta dues vegades: net_amount i discount quedarien
+        incoherents entre elles i el formula_break saltaria només per aquestes.
+     2. Un sol UPDATE al final, quan la taula ja és completa.
+
+   El pas 1 només és correcte si dbo ja està en la convenció d'ara, i **el dia
+   que es canvia no ho està**: dbo porta la d'ahir. Si es deixés així, les
+   línies velles sortirien en multiplicador i les noves en percentatge, dins la
+   mateixa taula i sense que cap check ho veiés — la fallada d'aquesta casa.
+   Per això sp_swap_staging_to_prod deixa escrit a
+   cfg.settings.DISCOUNT_AS_PERCENT_PUBLISHED amb quina convenció va publicar, i
+   aquí es força FULL quan no coincideix amb la d'ara. El mode FULL ignora dbo,
+   i des que l'origen és local ja no és car. No depèn que ningú se'n recordi.
 
    MODE FULL vs INCREMENTAL
    ------------------------
@@ -57,6 +91,14 @@ BEGIN
     SELECT @full_weekday = TRY_CAST([value] AS int) FROM cfg.settings WHERE [key] = 'FULL_RELOAD_WEEKDAY';
     SELECT @window_days  = TRY_CAST([value] AS int) FROM cfg.settings WHERE [key] = 'INCREMENTAL_WINDOW_DAYS';
 
+    /* Convenció del discount cap a Analitza, i amb quina es va publicar dbo.
+       Veure el capçal. */
+    DECLARE @discount_as_percent bit = 0, @discount_published bit = 0;
+    SELECT @discount_as_percent = ISNULL(TRY_CAST([value] AS bit), 0)
+    FROM   cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT';
+    SELECT @discount_published  = ISNULL(TRY_CAST([value] AS bit), 0)
+    FROM   cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUBLISHED';
+
     DECLARE @today  date = CAST(SYSUTCDATETIME() AS date);
     DECLARE @cutoff date = DATEADD(DAY, -ISNULL(@window_days, 7), @today);
     DECLARE @dow_iso int = ((DATEPART(WEEKDAY, @today) + @@DATEFIRST + 5) % 7) + 1;
@@ -65,6 +107,9 @@ BEGIN
     IF @ForceFull = 1                                    SET @full_mode = 1;
     IF @dow_iso = ISNULL(@full_weekday, 7)               SET @full_mode = 1;
     IF NOT EXISTS (SELECT 1 FROM dbo.est_linies_albara)  SET @full_mode = 1;
+    /* dbo esta en una convencio de discount diferent de la d'ara: no s'hi pot
+       copiar res a sobre. Passa un sol dia, el del canvi. Veure el capcal. */
+    IF @discount_as_percent <> @discount_published       SET @full_mode = 1;
 
     BEGIN TRY
         TRUNCATE TABLE staging.est_linies_albara;
@@ -93,7 +138,12 @@ BEGIN
                  product_price, product_cost, product_cost_2, net_amount, discount,
                  quantity, series, observations)
             SELECT l.id_invoice_line, l.invoices_id, l.[date], l.client_locations_id, l.products_id,
-                   l.product_price, l.product_cost, l.product_cost_2, l.net_amount, l.discount,
+                   l.product_price, l.product_cost, l.product_cost_2, l.net_amount,
+                   /* Aquestes línies vénen de dbo, o sigui en la convenció que
+                      ja s'ha publicat. Es normalitzen a multiplicador perquè
+                      l'UPDATE del final les tracti igual que les del mirall. */
+                   CAST(CASE WHEN @discount_as_percent = 1 THEN 1 - l.discount
+                             ELSE l.discount END AS decimal(9,6)),
                    l.quantity, l.series, l.observations
             FROM   dbo.est_linies_albara l
             WHERE  NOT EXISTS (
@@ -276,6 +326,13 @@ BEGIN
 
         SET @rows_out = @@ROWCOUNT;
 
+        /* Convenció del discount: un sol punt, amb la taula ja completa i tota
+           en multiplicador. @rows_out ja està capturat, així que aquest UPDATE
+           no el trepitja. */
+        IF @discount_as_percent = 1
+            UPDATE staging.est_linies_albara
+            SET    discount = CAST(1 - discount AS decimal(9,6));
+
         /* rows_in = total línies al mirall (per audit) */
         SELECT @rows_in =
               (SELECT COUNT_BIG(*) FROM sap_raw.DLN1 WHERE LineType <> 'T' AND ItemCode IS NOT NULL)
@@ -286,7 +343,11 @@ BEGIN
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, rows_in, rows_out, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_load_invoice_lines', @started, SYSUTCDATETIME(), @rows_in, @rows_out,
                     DATEDIFF(MILLISECOND, @started, SYSUTCDATETIME()), 'OK',
-                    CASE WHEN @full_mode = 1 THEN 'mode=FULL' ELSE 'mode=INCREMENTAL window_days=' + CAST(@window_days AS varchar(10)) END);
+                    CASE WHEN @full_mode = 1
+                              THEN 'mode=FULL'
+                                   + CASE WHEN @discount_as_percent <> @discount_published
+                                          THEN ' (forcat: canvi de convencio del discount)' ELSE '' END
+                              ELSE 'mode=INCREMENTAL window_days=' + CAST(@window_days AS varchar(10)) END);
     END TRY
     BEGIN CATCH
         DECLARE @err nvarchar(max) = ERROR_MESSAGE();

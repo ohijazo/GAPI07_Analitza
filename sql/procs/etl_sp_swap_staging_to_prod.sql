@@ -80,6 +80,21 @@ BEGIN
                    issue_date, due_date, payment_method
             FROM   staging.est_cobraments;
 
+            /* Amb quina convencio de discount ha quedat dbo.est_linies_albara.
+               Va DINS de la transaccio, amb les dades: si el swap es desfa,
+               aquesta marca s'ha de desfer amb ell o sp_load_invoice_lines
+               creuria que dbo esta en una convencio que no te.
+
+               Qui ho llegeix es sp_load_invoice_lines, per decidir si la copia
+               incremental des de dbo encara val. Veure el seu capcal. */
+            IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUBLISHED')
+                INSERT cfg.settings ([key], [value], description)
+                VALUES ('DISCOUNT_AS_PERCENT_PUBLISHED', '0', 'Convencio de discount amb que es va publicar dbo.est_linies_albara per ultim cop. L escriu sp_swap_staging_to_prod; no es toca a ma.');
+
+            UPDATE cfg.settings
+            SET    [value] = (SELECT ISNULL([value], '0') FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT')
+            WHERE  [key] = 'DISCOUNT_AS_PERCENT_PUBLISHED';
+
         COMMIT TRANSACTION;
 
         IF @RunId IS NOT NULL

@@ -52,3 +52,34 @@ IF OBJECT_ID('baseline.est_linies_albara') IS NOT NULL
        nomes son d'escala. */
     ALTER TABLE baseline.est_linies_albara ALTER COLUMN discount decimal(9,6) NULL;
 GO
+
+/* -------------------------------------------------------------------------
+   2026-08-31 - Dos settings nous
+
+   Van tambe a 01_create_database.sql, al bloc de seeds guardats. Aqui hi son
+   perque una BD ja desplegada no els te i les dues instal.lacions han de
+   quedar iguals: si divergeixen, validar a test deixa de dir res de la
+   productiva.
+   ------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ALLOW_DESTRUCTIVE_SCHEMA')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('ALLOW_DESTRUCTIVE_SCHEMA', '0', 'Permis d un sol us per deixar que 01_create_database.sql faci DROP de les dbo.est_* quan ja tenen dades. Normalment no cal: per posar al dia una BD desplegada hi ha aquest mateix fitxer. El propi script el torna a 0 despres dels DROP.');
+GO
+
+/* La convencio del discount NO es una preferencia nostra: es un canvi
+   coordinat amb Analitza i del mateix dia del tall.
+     '0' = multiplicador (1,00 = sense descompte)  -> el que feia KAIS
+     '1' = percentatge   (0,00 = sense descompte)  -> el que diu la seva guia
+   El llegeixen sp_load_invoice_lines i el check formula_break, i han de veure
+   el mateix valor. Si es posa a '1' i Analitza no treu el seu "1 - discount"
+   el mateix dia, els imports li surten a zero: es una fallada sorollosa a
+   proposit. Passos i ordre a docs/runbook_cutover.md. */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('DISCOUNT_AS_PERCENT', '0', 'Convencio de est_linies_albara.discount. 0 = multiplicador (KAIS, el que hi ha avui); 1 = percentatge (la guia d Analitza). Nomes es toca el dia del cutover i coordinadament amb Analitza: si ells no treuen el seu 1-discount el mateix dia, els imports surten a zero.');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUBLISHED')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('DISCOUNT_AS_PERCENT_PUBLISHED', '0', 'Amb quina convencio de discount es va publicar dbo.est_linies_albara per ultim cop. L escriu sp_swap_staging_to_prod dins de la transaccio del swap i NO es toca a ma: si no coincideix amb DISCOUNT_AS_PERCENT, sp_load_invoice_lines forca un FULL en comptes de copiar de dbo linies en l altra convencio.');
+GO

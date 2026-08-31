@@ -97,14 +97,32 @@ BEGIN
             SET @CriticalCount = @CriticalCount + 1;
         END
 
-        /* ----- 6) Fórmula KAIS: net_amount = price × qty × discount (WARN) ----- */
+        /* ----- 6) Fórmula del net_amount (WARN) -----
+
+           La fórmula depèn de la convenció del camp discount, que la mana
+           cfg.settings.DISCOUNT_AS_PERCENT i que canvia el dia del cutover:
+
+               '0' (avui)  discount és multiplicador  -> net = price * qty * discount
+               '1'         discount és percentatge    -> net = price * qty * (1 - discount)
+
+           Aquest check i sp_load_invoice_lines han de llegir el MATEIX setting.
+           Si només es canviés l'emissió, aquest check saltaria a cada línia la
+           nit del tall i el soroll taparia el que sí que importés. */
+        DECLARE @discount_as_percent bit = 0;
+        SELECT @discount_as_percent = ISNULL(TRY_CAST([value] AS bit), 0)
+        FROM   cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT';
+
         SELECT @cnt = COUNT(*) FROM staging.est_linies_albara
         WHERE  ABS(ISNULL(net_amount, 0)
-                   - ISNULL(product_price, 0) * ISNULL(quantity, 0) * ISNULL(discount, 1)) > 0.01;
+                   - ISNULL(product_price, 0) * ISNULL(quantity, 0)
+                     * CASE WHEN @discount_as_percent = 1 THEN 1 - ISNULL(discount, 0)
+                            ELSE ISNULL(discount, 1) END) > 0.01;
         IF @cnt > 0
             INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
             VALUES (@rid, 'formula_break', 'WARN',
-                    'Linies on net_amount != price*qty*discount per > 1c: ' + CAST(@cnt AS varchar(20)));
+                    'Linies on net_amount != price*qty*'
+                    + CASE WHEN @discount_as_percent = 1 THEN '(1-discount)' ELSE 'discount' END
+                    + ' per > 1c: ' + CAST(@cnt AS varchar(20)));
 
         /* ----- 7) Pic anòmal en compte de línies del dia (WARN) ----- */
         DECLARE @today_count int, @avg_count float;
