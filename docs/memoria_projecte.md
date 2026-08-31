@@ -875,13 +875,22 @@ SAP arrenca.
   |---|---|
   | El job de SQL Agent | ✅ ara corre com a `gapi07_etl` |
   | El Worker desplegat a `AE01SAPRDP` | anirà amb `gapi07_worker` a `appsettings.Production.json` |
-  | Desplegaments, sonda i user-secrets locals | `sql/security/Create-AdminUser.ps1`: login nominal
-    `ohijazo_sql`, `db_owner` **només** a `IntercanviSAP`, `SQLAgentOperatorRole` a `msdb` i
-    `DENY CONNECT` a les BD de SAP. **Pendent d'executar** |
+  | Desplegaments, sonda i user-secrets locals | ✅ **fet el 31/08/2026**: login nominal `ohijazo_sql`
+    (`sql/security/Create-AdminUser.ps1`) |
 
-  El `SQLAgentOperatorRole` hi és perquè `sqlagent_analitza_etl_daily.sql` fa `sp_add_job`: sense
-  això el desplegament falla a mitges i algú tornaria a agafar `sa`, que és exactament el camí de
-  tornada que es vol tancar.
+  `ohijazo_sql` té `db_owner` **només** a `IntercanviSAP`, `SQLAgentOperatorRole` a `msdb` i
+  `DENY CONNECT` a `DB_FARINERA_TEST` i `SBO-COMMON`. Verificat: `IS_SRVROLEMEMBER('sysadmin') = 0`
+  i **cap rol de servidor**. El `SQLAgentOperatorRole` hi és perquè `sqlagent_analitza_etl_daily.sql`
+  fa `sp_add_job`: sense això el desplegament falla a mitges i algú tornaria a agafar `sa`, que és
+  exactament el camí de tornada que es vol tancar.
+
+  Provat d'extrem a extrem amb la credencial nova: `--once` refresca el mirall, i `sp_run_all` fa
+  els nou passos i s'atura al `vanished_ids` de sempre. Els user-secrets ja no contenen `sa` i les
+  sis claus hi són senceres.
+
+  **El que queda de `sa`**: `appsettings.Production.json` a `AE01SAPRDP`, que encara no existeix, i
+  allà hi ha d'anar `gapi07_worker`. A partir d'aquí, rotar `sa` és una conversa amb Sistemes i ja
+  no ens afecta.
 
   És **nominal** i no tècnic perquè el fa servir una persona, no un procés: a l'auditoria hi ha de
   constar qui va fer la feina manual. Els comptes tècnics (`gapi07_worker`, `gapi07_etl`) són per al
