@@ -868,8 +868,24 @@ SAP arrenca.
   enlloc, i **es connecta amb la nova per comprovar que funciona** abans de donar-la per bona.
 - **Rotar la contrasenya de `sa`**: ha quedat exposada durant la sessió del 25/08/2026. Decidit el
   31/08 **no rotar-la encara**: aquest servidor allotja SAP B1 i no es pot verificar qui més la fa
-  servir. Primer treure-la del nostre camí —el job ja no hi va— i després rotar-la amb Sistemes al
-  davant.
+  servir. L'ordre és **deixar de necessitar-la primer**, i llavors rotar-la amb Sistemes al davant
+  deixa de ser un risc per a nosaltres. On era:
+
+  | On | Estat |
+  |---|---|
+  | El job de SQL Agent | ✅ ara corre com a `gapi07_etl` |
+  | El Worker desplegat a `AE01SAPRDP` | anirà amb `gapi07_worker` a `appsettings.Production.json` |
+  | Desplegaments, sonda i user-secrets locals | `sql/security/Create-AdminUser.ps1`: login nominal
+    `ohijazo_sql`, `db_owner` **només** a `IntercanviSAP`, `SQLAgentOperatorRole` a `msdb` i
+    `DENY CONNECT` a les BD de SAP. **Pendent d'executar** |
+
+  El `SQLAgentOperatorRole` hi és perquè `sqlagent_analitza_etl_daily.sql` fa `sp_add_job`: sense
+  això el desplegament falla a mitges i algú tornaria a agafar `sa`, que és exactament el camí de
+  tornada que es vol tancar.
+
+  És **nominal** i no tècnic perquè el fa servir una persona, no un procés: a l'auditoria hi ha de
+  constar qui va fer la feina manual. Els comptes tècnics (`gapi07_worker`, `gapi07_etl`) són per al
+  que corre sol.
 - ~~Primer commit del repo~~ ✅ fet el 25/08 (`ef846fa`)
 
 ---
