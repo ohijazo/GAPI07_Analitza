@@ -16,6 +16,11 @@
 # Despres d'executar-lo, apunta la contrasenya nova al gestor de contrasenyes
 # i passa-la a Analitza per un canal a part del correu. No es pot recuperar.
 
+# Cal executar-lo amb un administrador del servidor (-AdminUser sa): rotar un
+# login es una operacio de servidor i ohijazo_sql, que es el compte del dia a
+# dia, no hi arriba a proposit. Es una operacio manual i rara; no val la pena
+# obrir-li permisos de servidor per aixo.
+
 param(
     [string]$Server    = 'AE01SAPSQL',
     [string]$Login     = 'analitza_ro',
@@ -50,6 +55,29 @@ $conn = New-Object System.Data.SqlClient.SqlConnection `
 $conn.Open()
 
 try {
+    # El permis PRIMER, i l'existencia despres.
+    #
+    # sys.sql_logins nomes ensenya els logins sobre els quals tens permisos:
+    # un compte sense ALTER ANY LOGIN hi veu el seu i prou. Si es comprova
+    # l'existencia abans que el permis, un compte acotat rep
+    # "el login no existeix" quan el que passa es que no el pot veure -i
+    # llavors va a crear-ne un que ja hi era. El 31/08/2026 va passar,
+    # executant-ho amb ohijazo_sql.
+    $perm = $conn.CreateCommand()
+    $perm.CommandText = "SELECT HAS_PERMS_BY_NAME(NULL, NULL, 'ALTER ANY LOGIN');"
+    if ([int]$perm.ExecuteScalar() -eq 0) {
+        Write-Host ""
+        Write-Host "'$AdminUser' no te ALTER ANY LOGIN: canviar la contrasenya d'un login es una" -ForegroundColor Red
+        Write-Host "operacio de servidor i aquest compte no en te permisos." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Torna-ho a executar amb un administrador del servidor:" -ForegroundColor Yellow
+        Write-Host "    .\Rotate-AnalitzaPassword.ps1 -AdminUser sa" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "NO afegeixis ALTER ANY LOGIN a '$AdminUser': permet canviar la contrasenya de" -ForegroundColor Yellow
+        Write-Host "qualsevol login, sysadmins inclosos, o sigui que equival a fer-lo sysadmin." -ForegroundColor Yellow
+        exit 2
+    }
+
     $exists = $conn.CreateCommand()
     $exists.CommandText = "SELECT COUNT(*) FROM sys.sql_logins WHERE name = @login;"
     [void]$exists.Parameters.AddWithValue('@login', $Login)
