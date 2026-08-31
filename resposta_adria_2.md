@@ -120,6 +120,16 @@ Dues opcions, i és decisió vostra perquè depèn de com mireu les dades:
 Si trieu la 2, us puc dir exactament quins articles queden sense classificar perquè algú d'aquí ho
 completi abans del tall.
 
+## Els atributs de client
+
+Repassant la teva llista de camps del maig, us enviem `ZONA` i, de propina, `payment_method` i
+`payment_description`, que no ens havies demanat. Però n'hi ha dos de la teva llista que **no us
+arriben com a atributs**: `RAÓ SOCIAL` i `ACTIU`.
+
+Els teniu tots dos a la taula de clients, a `name` i `active`, i em jugo que és d'allà d'on els
+llegiu. Confirma-m'ho: si els necessiteu **com a atributs**, són dues columnes més i les afegeixo
+sense problema, però prefereixo saber-ho ara que no pas el 2 de novembre.
+
 ## `product_cost` i el marge d'octubre
 
 Tens raó i no te'l puc resoldre. El cost congelat al moment de l'albarà no s'exposa per l'API oficial
@@ -152,7 +162,8 @@ tornem a deixar-ho com estava. Ho podem preparar amb temps i fer-ho en una tarda
 2. **Famílies**: opció 1 o opció 2?
 3. **Congelem el número d'adreça** al tall, o vigilem l'alarma?
 4. **La vostra càrrega acumula o substitueix** la finestra de 90 dies?
-5. L'exportació de clients actualitzada, cap a finals d'octubre.
+5. **`RAÓ SOCIAL` i `ACTIU`**: els voleu com a atributs, o ja us van bé a la taula de clients?
+6. L'exportació de clients actualitzada, cap a finals d'octubre.
 
 Salutacions,
 Oscar Hijazo
@@ -162,6 +173,10 @@ ohijazo@agrienergia.com
 ---
 
 > **Nota interna (no enviar).**
+>
+> **ENVIAT el 31/08/2026.** A partir d'aqui el projecte espera cinc respostes: el `/100`,
+> families, congelar el numero d'adreca, si la seva carrega acumula o substitueix, i els
+> atributs `RAO SOCIAL` / `ACTIU`. La urgent es el `/100`; si no contesta, insistir-hi sol.
 >
 > **Fet i commitejat el 28/08/2026** (`e29b22c`, `3e6ecb4`):
 > - `U_FCCodiKais` / `U_FCNewCardCode` a `sap_raw.OCRD`, `U_FCCodiKais` a `sap_raw.OSLP`.
@@ -197,3 +212,13 @@ ohijazo@agrienergia.com
 >
 > **`OITB.U_FCCodiKais` ja no cal poblar-lo**: accepta que els ids de família canviïn. Es queda creat
 > i buit, sense conseqüències.
+>
+> **Afegit el 31/08/2026** — la pregunta 5 (`RAÓ SOCIAL` i `ACTIU` com a atributs) surt del repàs
+> de la seva llista del 12/05/2025 (`docs/correus_adria_2025-05-12.md`). Si contesta que els vol com
+> a atributs són dues columnes noves a `est_atributs_client` i un canvi a
+> `sp_load_client_attributes`; si diu que els llegeix de `est_clients`, es tanca el punt i no es toca
+> res. El que no volem és descobrir-ho al novembre.
+>
+> **El discount, preparat però desactivat (31/08/2026).** El canvi de convenció està implementat i
+> provat darrere de `cfg.settings.DISCOUNT_AS_PERCENT`, que val `'0'`. El dia del tall és un UPDATE,
+> no una edició de SPs amb pressa. Passos i ordre a `docs/runbook_cutover.md`.

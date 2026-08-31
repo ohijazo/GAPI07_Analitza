@@ -3,7 +3,7 @@
 > Visió executiva completa: què és, com funciona, què s'ha decidit i per què, què s'ha
 > trobat pel camí i què queda obert.
 >
-> Última actualització: **25/08/2026**
+> Última actualització: **31/08/2026**
 
 ---
 
@@ -232,13 +232,14 @@ notava perquè no havia canviat res.
 `peticio_sistemes_worker.docx`. Fins llavors el job de les 03:00 avortarà amb
 `ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
 
-**Tres usuaris diferents, i els crea gent diferent:**
+**Quatre comptes diferents, i els crea gent diferent:**
 
-| Usuari | Per a què | Qui |
+| Compte | Per a què | Qui |
 |---|---|---|
 | Windows (`AGRIENERGIA\svc_gapi07`) | Executar la tasca a `AE01SAPRDP` | Sistemes |
 | SAP Service Layer (`GAPI07_RO`) | Llegir SAP. Ara va amb `OHijazo`, nominal | Oscar |
-| SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. Ara va amb `sa` | Oscar — `sql/security/Create-WorkerUser.ps1` |
+| SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. En local encara va amb `sa` | Oscar — `sql/security/Create-WorkerUser.ps1` |
+| SQL Server (`gapi07_etl`) | Context del pas del job. **Sense login**: no s'hi connecta ningú, només s'impersona | Oscar — `sql/security/create_etl_user.sql`, 31/08/2026 |
 
 Per al de SAP hi ha guia a `docs/usuari_tecnic_sap.md`, amb un avís que pot bloquejar: **un usuari
 de SAP consumeix llicència**. Si no n'hi ha cap de lliure, no es pot crear i cal decidir-ho amb el
@@ -639,15 +640,34 @@ Recollits a `.claude/rules/02-service-layer-odata.md`. Cadascun ve d'un bug real
 
 ### Paranys que continuen al codi
 
-**`deploy.sql` NO és idempotent, encara que ho digui.** `01_create_database.sql` comença amb
-`DROP TABLE dbo.est_*` — les vuit taules que llegeix Analitza — per tornar-les a crear buides.
-Executar `deploy.sql` sencer deixa Analitza sense dades fins a la següent càrrega correcta.
+**El parany del `deploy.sql` — tancat el 31/08/2026.** `01_create_database.sql` comença amb
+`DROP TABLE dbo.est_*` — les vuit taules que llegeix Analitza — i `deploy.sql` es declarava
+idempotent. Executar-lo sencer deixava Analitza sense dades fins a la següent càrrega correcta; per
+això el 25/08 es van desplegar **només els procediments**, un per un.
 
-Per això el 25/08 es van desplegar **només els procediments**, un per un, i no amb `deploy.sql`.
+S'han fet les dues coses alhora:
 
-Cal decidir què se'n fa: o s'hi posa una guarda que impedeixi executar-lo si `dbo.est_*` té files,
-o es treu la paraula "idempotent" del capçal i del README i es documenta com a script de creació
-inicial. **Mentre no es faci, no executar `deploy.sql` en un entorn amb dades.**
+- **Guarda a `01_create_database.sql`**: si `dbo.est_*` té files, l'script avorta amb un missatge que
+  diu què fer. L'escapatòria és `cfg.settings.ALLOW_DESTRUCTIVE_SCHEMA = '1'`, que el propi script
+  torna a `'0'` just després dels DROP — el permís és d'un sol ús. Va a `cfg.settings` i no a una
+  variable de `sqlcmd` perquè ha de valer igual des de SSMS, des del script de PowerShell i des del
+  que sigui d'aquí a un any. El recompte surt de `sys.partitions`: en una instal·lació nova les
+  taules encara no existeixen i un `SELECT COUNT(*)` no compilaria.
+- **`01` ja no el crida `deploy.sql`.** És creació inicial i s'executa una sola vegada, a mà. Per
+  posar al dia una BD desplegada hi ha `04_migracions.sql`, que sí que es crida. Amb `01` fora,
+  `deploy.sql` és idempotent de debò.
+
+Provat contra `IntercanviSAP` amb les 15.595 files a dins: avorta amb el permís a `'0'`, deixa passar
+amb `'1'`, i el consum el torna a `'0'`. Cap taula va perdre files.
+
+**Els dos camins de desplegament havien divergit (31/08/2026).** `deploy_via_powershell.ps1` és el
+que es fa servir de debò —no hi ha `sqlcmd` en aquesta màquina— i la seva llista de fitxers no
+coincidia amb la de `sql/deploy.sql`. Li faltaven `04_migracions.sql` (el `discount` es quedava a
+`decimal(5,2)` i `formula_break` hauria saltat cada nit), `etl_vw_kais_codes.sql` —les tres vistes,
+sense les quals els **cinc** SP que hi fan JOIN ni tan sols es creen— i el job de SQL Agent.
+
+No és teòric: qui munti la productiva al novembre farà servir aquell fitxer. Sincronitzades, i amb un
+avís al capçal de tots dos que han de coincidir.
 
 ### Falsa alarma
 
@@ -690,6 +710,21 @@ falten dos mesos per a productiva.
 
 ### Decisions pendents
 
+**Correu enviat a l'Adrià el 31/08/2026** (`resposta_adria_2.md` / `.docx`). Hi van cinc preguntes, i
+tres bloquegen feina nostra amb data 1 de novembre:
+
+1. **El `/100`** — la urgent. Les seves SQL divideixen `product_price` i `product_cost` per 100 però
+   no `net_amount`. O el treu ell el dia del tall, o els hi enviem multiplicats per 100, però s'ha de
+   decidir: sense resposta és un error silenciós el dia 2. Si no contesta, insistir-hi sol.
+2. **Famílies**: els 110 grups de SAP (canvia la taxonomia) o la categoria comercial (la conserva,
+   però 1.776 de 2.028 articles no la tenen informada).
+3. **Congelar el número d'adreça** al tall, o confiar en l'alarma `vanished_ids` (§6.5).
+4. **Si la seva càrrega acumula o substitueix** la finestra de 90 dies. Si substitueix, el problema
+   del cost d'octubre és molt més gros del que ell descriu.
+5. **`RAÓ SOCIAL` i `ACTIU` com a atributs**: si els vol, són dues columnes noves a
+   `est_atributs_client` i un canvi a `sp_load_client_attributes`.
+
+
 - **Usuari tècnic de SAP.** Ara la sonda va amb `OHijazo`, un usuari **nominal**, amb contrasenya
   de 4 caràcters. Per a la sonda és acceptable (només llegeix), però per al job nocturn no: els
   logs d'auditoria de SAP atribuirien les lectures de l'ETL a una persona, i el dia que aquesta
@@ -702,15 +737,32 @@ falten dos mesos per a productiva.
   `net_amount = price × qty × (1 - discount)`. KAIS els enviava el multiplicador, i ho tapen amb un
   `1 - discount` al seu costat. Nosaltres hem replicat la convenció de KAIS.
 
-  Se li proposa normalitzar-ho el dia del tall. **Si accepta, van tres canvis alhora, tots tres o
-  cap:**
-  1. `sp_load_invoice_lines`: emetre `1 - multiplicador`.
-  2. `sp_data_quality_checks`: el check `formula_break` passa a `price × qty × (1 - discount)`.
-  3. `.claude/rules/04-contracte-analitza.md` i aquesta memòria, que ara documenten la convenció
-     del multiplicador com si fos la bona.
+  Se li proposa normalitzar-ho el dia del tall. Si ell no treu el seu `1 - discount` el mateix dia,
+  falla de manera sorollosa: els imports sortirien a zero. Val més això que un error silenciós.
 
-  Si ell no treu el seu `1 - discount` el mateix dia, falla de manera sorollosa: els descomptes
-  passarien de `0.00` a `1.00` i els imports sortirien a zero. Val més això que un error silenciós.
+  **Implementat el 31/08/2026, però desactivat.** El canvi és `cfg.settings.DISCOUNT_AS_PERCENT`
+  (`'0'` = multiplicador, el d'avui). El dia del tall és un `UPDATE`, no editar SPs amb pressa. El
+  llegeixen `sp_load_invoice_lines` i el check `formula_break`, que han de veure el mateix valor.
+  Falta encara el punt 3: `.claude/rules/04-contracte-analitza.md` i aquesta memòria documenten la
+  convenció del multiplicador com si fos l'única, i això es toca el dia 2, no ara.
+
+  **El forat que va aparèixer provant-ho, i que és el de sempre.** La conversió és un sol `UPDATE` al
+  final de `sp_load_invoice_lines`, i el mode incremental copia de `dbo` les línies dels documents
+  que no es refresquen. El dia del canvi aquelles línies porten la convenció d'**ahir**: la taula
+  hauria sortit mig en multiplicador i mig en percentatge, cada meitat coherent amb el seu
+  `net_amount`, i **cap dels nou checks ho hauria vist**. La cinquena de la mateixa família que
+  `LineType`, `product_cost` i el `/100`.
+
+  Resolt sense dependre que ningú se'n recordi: `sp_swap_staging_to_prod` deixa escrit a
+  `cfg.settings.DISCOUNT_AS_PERCENT_PUBLISHED` amb quina convenció va publicar `dbo` —dins de la
+  mateixa transacció del swap, perquè si el swap es desfà la marca es desfaci amb ell— i
+  `sp_load_invoice_lines` força FULL mentre no coincideixi amb la d'ara. FULL ja no és car des que
+  l'origen és local.
+
+  Provat el 31/08/2026 als quatre casos: amb el flag a 0 i a 1, `net_amount`, `product_price` i
+  `quantity` són idèntics i només canvia el `discount`; `formula_break` calla en tots dos;
+  l'incremental el dia del canvi es converteix en FULL tot sol; i l'incremental en règim estable no
+  dona la volta dues vegades. Els passos del dia són a **`docs/runbook_cutover.md`**.
 - **Refresc de `DB_FARINERA_TEST` des de productiva**, per poder validar de debò.
 
 ### Migració
@@ -718,22 +770,32 @@ falten dos mesos per a productiva.
 Fases 0 a 4 tancades (§5, §6). Queda:
 
 - **Configurar el Worker per al compte de SQL Agent**, o el job seguirà fallant cada nit (§5).
-- **Fase 5 — no es pot fer tal com estava plantejada.** Comprovat el 26/08/2026: els usuaris de
+- **Fase 5 — replantejada el 26/08 i tancada a mitges el 31/08.** Els usuaris de
   `DB_FARINERA_TEST` són tots de SAP (`B1_*`, `SAPB1_*`, `LOG_*`), més `analitza_ro` —que ja té
   `DENY CONNECT`— i `NT AUTHORITY\SYSTEM`. **`sa` no hi surt com a usuari** perquè és sysadmin, i a
-  un sysadmin no se li pot denegar res.
+  un sysadmin no se li pot denegar res. O sigui que "revocar l'accés" no és una qüestió de permisos
+  sinó de **sota quin compte corre l'ETL**.
 
-  O sigui que "revocar l'accés" no és una qüestió de permisos sinó de **sota quin compte corre
-  l'ETL**. Ara mateix: cap procediment fa referència a SAP —el codi ja no pot— però el compte sí que
-  podria. La feina real és:
+  1. **El job de SQL Agent — fet el 31/08/2026.** Estava en propietat de `sa` i el seu pas no tenia
+     context d'usuari: `EXEC etl.sp_run_all` corria com a **sysadmin**. Ara el pas porta
+     `@database_user_name = 'gapi07_etl'`, un usuari **sense login**
+     (`sql/security/create_etl_user.sql`) amb permisos només dins d'`IntercanviSAP`. Que no tingui
+     login és el que importa: no serveix per connectar-se de fora i **no té àmbit fora de la seva
+     BD**, així que cap base de dades de SAP li és accessible i això no depèn de cap `DENY` que algú
+     pugui desfer.
 
-  1. El Worker amb `gapi07_worker` (`sql/security/create_worker_user.sql`), no amb `sa`.
-  2. El job de SQL Agent corrent sota un compte que no sigui sysadmin, amb permisos només sobre
-     `IntercanviSAP`.
+     Verificat executant l'ETL sencer impersonant-lo —els nou passos OK i els mateixos recomptes que
+     amb `sa`— i el swap dins d'una transacció que es va desfer. Després, el job de debò:
+     *«Executed as user: gapi07_etl»*.
 
-  Fins que això no es faci, la Regla 01 és una convenció d'equip, no una barrera tècnica.
-  `sql/security/revoke_sap_direct_access.sql` ja ho advertia a la secció 2; ara està confirmat amb
-  dades.
+  2. **El Worker amb `gapi07_worker`** (creat el 27/08, `GRANT` només sobre `sap_raw` i `DENY`
+     explícit a `dbo`, `staging` i `audit`) — **pendent**. Al servidor això és el
+     `appsettings.Production.json` que farà Sistemes; en local encara va amb `sa`. Compte: `--probe`
+     llegeix `baseline.est_*` / `dbo.est_*` per tenir referència, i `gapi07_worker` no hi arriba. La
+     sonda és una eina de diagnòstic local, no part del camí desplegat, però si algun dia es vol
+     executar amb el compte del Worker caldrà decidir-ho expressament.
+
+  `sql/security/revoke_sap_direct_access.sql` ja advertia d'això a la secció 2.
 - Resoldre l'única diferència que queda contra `baseline`: `product_cost` (§6.2).
 
 ### Del projecte, anteriors a la migració
@@ -772,6 +834,11 @@ de quin històric es comptarà? Disposaran d'una base de dades de test?
 **Bloc E — Cutover, 2 de novembre de 2026.** Tall sec: KAIS deixa de rebre dades el mateix dia que
 SAP arrenca.
 
+> Els passos concrets del dia, amb ordre, comprovacions i rollback, són a
+> **`docs/runbook_cutover.md`** (escrit el 31/08/2026). Fins llavors estaven escampats entre aquesta
+> memòria, la Regla 04 i la nota interna de dos correus, i són cinc canvis coordinats del mateix dia.
+
+
 - **Data límit 1 de novembre**, no el dia 2: els UDFs amb els codis de KAIS han d'estar creats i
   **poblats** abans. Si el dia 2 s'envien els codis de SAP, Analitza els ingereix com a clients nous
   i desfer-ho després surt molt més car que fer-ho bé d'entrada. Això converteix la creació dels
@@ -785,8 +852,24 @@ SAP arrenca.
 
 ### Higiene
 
-- **Rotar la contrasenya de `sa`**: ha quedat exposada durant la sessió del 25/08/2026
-- Login dedicat per a l'ETL i el Worker en comptes de `sa`
+- **`analitza_ro` veia molt més que el contracte — tancat el 31/08/2026.** Era `db_datareader` de
+  tota la BD, i comprovat en viu podia llegir `sap_raw.OCRD`, `sap_raw.DLN1`, `staging.*`, `audit.*`
+  i `cfg.settings`. La Regla 01 diu que Analitza «no veu SAP mai» i la Regla 04 diu que el contracte
+  són les vuit `dbo.est_*`; amb `db_datareader` veia una còpia literal de les taules internes de SAP,
+  cosa que a més empitjora la pregunta oberta del **licenciament indirecte** (§9), que no va del
+  compte tècnic sinó de qui consumeix les dades.
+
+  Ara: `GRANT SELECT ON SCHEMA::dbo` —`dbo` conté exactament les vuit `est_*` i res més— i `DENY
+  SELECT` explícit a `sap_raw`, `staging`, `audit`, `cfg` i `etl`. Verificat amb `EXECUTE AS`: llegeix
+  `dbo.est_*` i no llegeix cap de les altres.
+
+- **Rotar la contrasenya d'`analitza_ro`**, que és un placeholder desconegut i bloqueja el handoff.
+  Hi ha `sql/security/Rotate-AnalitzaPassword.ps1`, que la demana interactivament, no l'escriu
+  enlloc, i **es connecta amb la nova per comprovar que funciona** abans de donar-la per bona.
+- **Rotar la contrasenya de `sa`**: ha quedat exposada durant la sessió del 25/08/2026. Decidit el
+  31/08 **no rotar-la encara**: aquest servidor allotja SAP B1 i no es pot verificar qui més la fa
+  servir. Primer treure-la del nostre camí —el job ja no hi va— i després rotar-la amb Sistemes al
+  davant.
 - ~~Primer commit del repo~~ ✅ fet el 25/08 (`ef846fa`)
 
 ---
@@ -931,6 +1014,7 @@ Ara són quatre llocs, i si se'n salta un el camp arriba buit sense error:
 P:\GAPI07_Analitza├── CLAUDE.md + .claude
 ules\      Regles del projecte (5)
 ├── docs│   ├── memoria_projecte.md         Aquest fitxer
+│   ├── runbook_cutover.md          Els passos de l'1 i el 2 de novembre
 │   ├── correus_adria_2025-05-12.md Els correus de l'Adrià, transcrits dels PDF
 │   ├── Guia de importación de datos Analitza CM v9.pdf
 │   └── Integracio_GAPI07.pdf
