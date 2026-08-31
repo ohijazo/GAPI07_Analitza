@@ -22,7 +22,7 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 | **Sistemes** | Worker desplegat a `AE01SAPRDP` i ruta oberta a les IPs d'Analitza |
 | **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |
 | **Consultors de SAP** | Confirmar que la productiva arrenca **sense** històric d'albarans. Tot el raonament del pas 2.3 hi penja i ningú ho ha verificat |
-| **Nosaltres** | Rotar `analitza_ro`, que és un placeholder desconegut, abans de passar-li la contrasenya. Eina: `sql/security/Rotate-AnalitzaPassword.ps1` |
+| **Nosaltres** | Res. La contrasenya d'`analitza_ro` es va rotar el 31/08/2026; passar-la-hi depèn que Sistemes obri la ruta |
 
 ---
 
@@ -51,13 +51,13 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    `OITB.U_FCCodiKais` (famílies) **no cal poblar-lo**: l'Adrià accepta que els ids de família
    canviïn. Es queda creat i buit.
 
-4. **Rotar `analitza_ro`** amb `sql/security/Rotate-AnalitzaPassword.ps1` —la demana
-   interactivament, no l'escriu enlloc i s'hi connecta per comprovar que funciona abans de donar-la
-   per bona— i passar-la per canal a part un cop Sistemes confirmi la ruta.
+4. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes
+   confirmi la ruta. Ja està rotada (31/08/2026) i apuntada al gestor.
 
-   El compte ja només veu `dbo.est_*` (tancat el 31/08/2026: abans era `db_datareader` de tota la BD
-   i arribava al mirall `sap_raw`). Si algun dia cal afegir-hi una taula, va a
-   `sql/security/create_analitza_user.sql`, no a un rol ampli.
+   El compte només veu `dbo.est_*` (tancat el mateix dia: abans era `db_datareader` de tota la BD i
+   arribava al mirall `sap_raw`). Si algun dia cal afegir-hi una taula, va a
+   `sql/security/create_analitza_user.sql`, no a un rol ampli. Si cal tornar-la a rotar, cal
+   `-AdminUser sa`: és una operació de servidor i `ohijazo_sql` no hi arriba a propòsit.
 
 ---
 

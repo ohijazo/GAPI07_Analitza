@@ -803,8 +803,10 @@ Fases 0 a 4 tancades (§5, §6). Queda:
 **Bloc A — Sistemes:** compte SMTP per a Database Mail; obrir el port 1433 per a la IP d'Analitza.
 Són feina d'infraestructura, no de SAP.
 
-**Bloc B — Handoff:** rotar la contrasenya d'`analitza_ro` (ara és un placeholder desconegut);
-enviar el correu a l'Adrià (`correu_adria.md`); confirmar que la seva VPN arriba a `AE01SAPSQL`.
+**Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al
+contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). Queda **passar-li la
+contrasenya per un canal a part** —al correu se li va dir que li arribaria quan hi hagués ruta— i
+confirmar que la seva VPN arriba a `AE01SAPSQL`. Totes dues coses depenen de Sistemes.
 
 **Bloc C — Pendent amb l'Adrià.** Revisat contra els seus correus del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`), tres dels pendents ja tenen resposta o camí:
@@ -863,9 +865,15 @@ SAP arrenca.
   SELECT` explícit a `sap_raw`, `staging`, `audit`, `cfg` i `etl`. Verificat amb `EXECUTE AS`: llegeix
   `dbo.est_*` i no llegeix cap de les altres.
 
-- **Rotar la contrasenya d'`analitza_ro`**, que és un placeholder desconegut i bloqueja el handoff.
-  Hi ha `sql/security/Rotate-AnalitzaPassword.ps1`, que la demana interactivament, no l'escriu
-  enlloc, i **es connecta amb la nova per comprovar que funciona** abans de donar-la per bona.
+- **Contrasenya d'`analitza_ro` rotada el 31/08/2026** amb
+  `sql/security/Rotate-AnalitzaPassword.ps1`, que la demana interactivament, no l'escriu enlloc, i
+  **es connecta amb la nova** per comprovar que llegeix `dbo.est_*` i que `sap_raw` li és denegat
+  abans de donar-la per bona. Deixa de bloquejar el handoff; ara depèn que Sistemes obri la ruta.
+
+  Rotar un login és una operació de **servidor** i `ohijazo_sql` no hi arriba a propòsit: cal
+  `-AdminUser sa`. No se li ha d'afegir `ALTER ANY LOGIN` per estalviar-s'ho — amb aquest permís es
+  pot canviar la contrasenya de qualsevol login, `sa` inclòs, i el compte acotat deixaria de
+  ser-ho.
 - **Rotar la contrasenya de `sa`**: ha quedat exposada durant la sessió del 25/08/2026. Decidit el
   31/08 **no rotar-la encara**: aquest servidor allotja SAP B1 i no es pot verificar qui més la fa
   servir. L'ordre és **deixar de necessitar-la primer**, i llavors rotar-la amb Sistemes al davant
