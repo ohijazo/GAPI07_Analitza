@@ -62,13 +62,30 @@ EXEC dbo.sp_add_jobserver
    transformar un mirall vell no la dona l'ordre dels passos sino la guarda de
    frescor de sp_run_all: si sap_raw.sync_state te mes de
    cfg.settings.MIRROR_MAX_AGE_HOURS hores, avorta amb ABORTED_STALE_MIRROR i
-   dbo.est_* es queda com estava. */
+   dbo.est_* es queda com estava.
+
+   @database_user_name = gapi07_etl
+   ---------------------------------
+   El job es propietat de `sa`. Sense aquesta linia el pas corre com a
+   **sysadmin**, i llavors el que impedeix que l'ETL torni a llegir taules de
+   SAP no es cap permis, es nomes que el codi ja no ho fa (Regla 01). Era el
+   que quedava obert de la Fase 5, mesurat el 31/08/2026.
+
+   gapi07_etl es un usuari SENSE LOGIN (sql/security/create_etl_user.sql): no
+   serveix per connectar-se de fora i no te ambit fora d'IntercanviSAP. Cap
+   base de dades de SAP li es accessible, i aixo no depen de cap DENY que algu
+   pugui desfer.
+
+   Si aquest usuari no existeix, el pas falla amb "The database user name
+   'gapi07_etl' is not valid" i el job no publica res. Es preferible a
+   arrencar en silenci amb sysadmin. */
 EXEC dbo.sp_add_jobstep
     @job_name   = @JobName,
     @step_name  = N'Run ETL',
     @step_id    = 1,
     @subsystem  = N'TSQL',
     @database_name = N'IntercanviSAP',
+    @database_user_name = N'gapi07_etl',
     @command    = N'EXEC etl.sp_run_all;',
     @on_success_action = 1,    -- 1 = quit success
     @on_fail_action    = 2,    -- 2 = quit failure
@@ -81,7 +98,7 @@ EXEC dbo.sp_add_jobschedule
     @freq_interval = 1,        -- every 1 day
     @active_start_time = 030000;
 
-PRINT 'Job Analitza_ETL_Daily creat (1 pas: ETL).';
+PRINT 'Job Analitza_ETL_Daily creat (1 pas: ETL, com a gapi07_etl).';
 PRINT 'El mirall el refresca el Worker a AE01SAPRDP, com a tasca programada a les 02:45.';
 PRINT 'Si no ha corregut, sp_run_all avorta amb ABORTED_STALE_MIRROR.';
 GO
