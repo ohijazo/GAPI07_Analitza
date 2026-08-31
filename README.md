@@ -280,10 +280,25 @@ sqlcmd -S AE01SAPSQL -U sa -P <password> -i "P:\GAPI07_Analitza\sql\verify.sql"
 
 ### Re-desplegar tots els SP (canvi de lògica)
 
+En aquesta màquina **no hi ha `sqlcmd`**, així que el camí real és el script de PowerShell:
+
 ```
-sqlcmd -S AE01SAPSQL -U sa -P <password> -i "P:\GAPI07_Analitza\sql\deploy.sql"
+$env:SQLPASS = '...'
+P:\GAPI07_Analitza\deploy_via_powershell.ps1
 ```
-És idempotent — pots executar-lo tantes vegades com vulguis sense trencar res.
+
+`sql\deploy.sql` fa exactament el mateix per a qui sí que tingui `sqlcmd` o SSMS en mode SQLCMD.
+**Les dues llistes de fitxers han de coincidir**; el 31/08/2026 havien divergit i la de PowerShell
+—la que es fa servir— es deixava les vistes `etl_vw_kais_codes`, sense les quals cinc dels SP ni tan
+sols es creen.
+
+Tots dos són idempotents i es poden executar tantes vegades com calgui.
+
+**Cap dels dos crida `sql\schema\01_create_database.sql`**, i és expressament: aquell script fa
+`DROP TABLE` de les vuit `dbo.est_*`, o sigui que deixaria Analitza sense dades fins a la següent
+càrrega correcta. És **creació inicial**, s'executa una sola vegada i a mà, i té una guarda que
+avorta si les taules ja tenen files. Per posar al dia una BD ja desplegada hi ha
+`sql\schema\04_migracions.sql`, que fa els mateixos canvis en forma d'`ALTER` guardat.
 
 ### Afegir un nou UDF com a atribut
 

@@ -15,9 +15,17 @@
      - audit : log d'execucions i warnings
      - cfg   : configuració (attribute_mapping, country_code_overrides, settings)
 
-   IMPORTANT: aquest script fa DROP TABLE de les est_* si existeixen amb el
-   format antic (LONG). Idempotent, però destructiu per les taules est_*.
-   audit/cfg/schemas no es toquen.
+   ATENCIO: aquest script NO es idempotent. Fa DROP TABLE de les vuit est_*
+   per tornar-les a crear buides, o sigui que sobre una BD amb dades deixa
+   Analitza sense res fins a la seguent carrega correcta. Es un script de
+   CREACIO INICIAL i s'executa una sola vegada.
+
+   Per posar al dia una BD ja desplegada, l'script es schema/04_migracions.sql,
+   que fa el mateix canvi en forma d'ALTER guardat i sense perdre files. Per
+   aixo deploy.sql ja no crida aquest fitxer.
+
+   Hi ha una guarda mes avall que avorta si dbo.est_* te files. audit/cfg i els
+   schemas no es toquen.
    ========================================================================= */
 
 USE master;
@@ -47,6 +55,53 @@ IF SCHEMA_ID('audit')   IS NULL EXEC ('CREATE SCHEMA [audit]');
 IF SCHEMA_ID('cfg')     IS NULL EXEC ('CREATE SCHEMA cfg');
 GO
 
+/* ---------- GUARDA: no esborrar les taules que llegeix Analitza ----------
+
+   El bloc de sota fa DROP de les vuit dbo.est_*. Sobre la BD desplegada aixo
+   deixa Analitza sense dades fins a la seguent carrega correcta, i el 25/08/2026
+   va obligar a desplegar els procediments un per un a ma per no disparar-ho.
+
+   La guarda mira si hi ha files i, si n'hi ha, atura l'script. L'escapatoria va a
+   cfg.settings i no a una variable de sqlcmd ni a una taula temporal: aixo
+   s'executa des de SSMS, des de deploy_via_powershell.ps1 i potser d'aqui a un
+   any des d'una altra cosa, i el permis ha de valer igual als tres casos i
+   quedar escrit alla on qualsevol el pot veure. El mateix script el torna a '0'
+   just despres dels DROP: es d'un sol us.
+
+   El recompte surt de sys.partitions i no d'un SELECT COUNT(*) perque en una
+   instal.lacio nova les taules encara no existeixen i el batch no compilaria
+   (la resolucio diferida de noms nomes va dins de procediments). Que sigui
+   aproximat no importa: la pregunta es "hi ha dades o no".
+   ------------------------------------------------------------------------- */
+DECLARE @est_rows bigint = 0, @allow nvarchar(400) = N'0';
+
+SELECT @est_rows = ISNULL(SUM(p.rows), 0)
+FROM   sys.partitions p
+JOIN   sys.objects   o ON o.object_id = p.object_id
+JOIN   sys.schemas   sc ON sc.schema_id = o.schema_id
+WHERE  p.index_id IN (0, 1)
+  AND  o.type = 'U'
+  AND  sc.name = 'dbo'
+  AND  o.name LIKE 'est[_]%';
+
+IF OBJECT_ID('cfg.settings') IS NOT NULL
+    SELECT @allow = [value] FROM cfg.settings WHERE [key] = 'ALLOW_DESTRUCTIVE_SCHEMA';
+
+IF @est_rows > 0 AND ISNULL(@allow, N'0') <> N'1'
+BEGIN
+    DECLARE @msg nvarchar(2000) =
+        N'01_create_database.sql avortat: dbo.est_* te ' + CAST(@est_rows AS nvarchar(20))
+        + N' files i aquest script les esborraria. Analitza es quedaria sense dades.'
+        + CHAR(13) + CHAR(10)
+        + N'Per posar al dia una BD ja desplegada, executa schema/04_migracions.sql.'
+        + CHAR(13) + CHAR(10)
+        + N'Si de debo vols recrear-les buides: UPDATE cfg.settings SET [value]=''1'' '
+        + N'WHERE [key]=''ALLOW_DESTRUCTIVE_SCHEMA''; i torna a executar. El permis '
+        + N'es consumeix tot sol.';
+    THROW 50001, @msg, 1;
+END
+GO
+
 /* ---------- DROP taules est_* antigues (format LONG) ---------- */
 /* Fem drop per tornar-les a crear amb l'esquema WIDE compatible amb KAIS.
    L'ordre no importa (no hi ha FKs entre elles). */
@@ -68,6 +123,13 @@ IF OBJECT_ID('dbo.est_clients_efectes_pendents')     IS NOT NULL DROP TABLE dbo.
 IF OBJECT_ID('staging.est_clients_efectes_pendents') IS NOT NULL DROP TABLE staging.est_clients_efectes_pendents;
 IF OBJECT_ID('dbo.est_cobraments')                   IS NOT NULL DROP TABLE dbo.est_cobraments;
 IF OBJECT_ID('staging.est_cobraments')               IS NOT NULL DROP TABLE staging.est_cobraments;
+GO
+
+/* El permis destructiu es d'un sol us: consumir-lo aqui, just despres dels
+   DROP, i no al final de l'script. Si alguna cosa peta mes avall, la BD no es
+   queda amb la guarda desarmada esperant el proxim que executi el fitxer. */
+IF OBJECT_ID('cfg.settings') IS NOT NULL
+    UPDATE cfg.settings SET [value] = N'0' WHERE [key] = N'ALLOW_DESTRUCTIVE_SCHEMA';
 GO
 
 /* =========================================================================
@@ -409,6 +471,25 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'LINES_MIN_RATIO')
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ID_DROP_MAX')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('ID_DROP_MAX', '10', 'Identificadors que poden desapareixer d un dia per l altre abans que el check vanished_ids passi de WARN a CRITICAL i aturi el swap. Apujar-lo expressament nomes si hi ha un canvi massiu previst (p.ex. el cutover).');
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ALLOW_DESTRUCTIVE_SCHEMA')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('ALLOW_DESTRUCTIVE_SCHEMA', '0', 'Permis d un sol us per deixar que 01_create_database.sql faci DROP de les dbo.est_* quan ja tenen dades. Normalment no cal: per posar al dia una BD desplegada hi ha schema/04_migracions.sql. El propi script el torna a 0 despres dels DROP.');
+
+/* Convencio del camp discount cap a Analitza. Aixo NO es una preferencia: es
+   un canvi coordinat amb ells i del mateix dia del tall.
+     '0' = multiplicador (1,00 = sense descompte)  -> el que feia KAIS
+     '1' = percentatge   (0,00 = sense descompte)  -> el que diu la seva guia
+   Si es posa a '1' i Analitza no treu el seu "1 - discount" el mateix dia, els
+   imports els surten a zero. Es una fallada sorollosa a proposit. Veure
+   docs/runbook_cutover.md. */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('DISCOUNT_AS_PERCENT', '0', 'Convencio de est_linies_albara.discount. 0 = multiplicador (KAIS, el que hi ha avui); 1 = percentatge (la guia d Analitza). Nomes es toca el dia del cutover i coordinadament amb Analitza: si ells no treuen el seu 1-discount el mateix dia, els imports surten a zero.');
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUBLISHED')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('DISCOUNT_AS_PERCENT_PUBLISHED', '0', 'Amb quina convencio de discount es va publicar dbo.est_linies_albara per ultim cop. L escriu sp_swap_staging_to_prod dins de la transaccio del swap i NO es toca a ma: si no coincideix amb DISCOUNT_AS_PERCENT, sp_load_invoice_lines forca un FULL en comptes de copiar de dbo linies en l altra convencio.');
 
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FULL_RELOAD_WEEKDAY')
     INSERT cfg.settings ([key], [value], description)

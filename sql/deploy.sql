@@ -1,8 +1,15 @@
 /* =========================================================================
    deploy.sql   -  Orquestrador de desplegament
    -------------------------------------------------------------------------
-   Crea la BD IntercanviSAP, instal.la tots els SP i seeds en l'ordre correcte.
-   Idempotent: es pot tornar a executar.
+   Instal.la les vistes, els SP, els seeds i el job en l'ordre correcte sobre una
+   BD IntercanviSAP que ja existeix. Idempotent: es pot tornar a executar tantes
+   vegades com calgui sense perdre dades.
+
+   NO crida schema\01_create_database.sql. Aquell fitxer fa DROP de les vuit
+   dbo.est_* per crear-les buides: es CREACIO INICIAL, s'executa una sola vegada
+   i a ma. Mentre va estar aqui, "idempotent" era mentida i executar deploy.sql
+   sencer hauria deixat Analitza sense dades. Els canvis d'esquema sobre una BD
+   viva van a schema\04_migracions.sql, que si que es crida.
 
    NO inclou schema\03_create_baseline.sql: la fotografia de referencia es
    pren UNA sola vegada, a ma, abans del tall a Service Layer. Veure el
@@ -16,10 +23,9 @@
 :setvar ROOT "P:\GAPI07_Analitza\sql"
 
 PRINT '==== 1/4  Schema =================================';
-:r $(ROOT)\schema\01_create_database.sql
 :r $(ROOT)\schema\02_create_sap_raw.sql
-/* Posa al dia una BD ja desplegada: 01 no es pot reexecutar sobre la
-   productiva perque fa DROP de les est_*. */
+/* Posa al dia una BD ja desplegada. 01_create_database.sql no hi es a proposit:
+   veure el capcal. */
 :r $(ROOT)\schema\04_migracions.sql
 
 PRINT '==== 2/4  Stored procedures =====================';
@@ -42,7 +48,9 @@ PRINT '==== 3/4  Seeds (cfg) ===========================';
 :r $(ROOT)\cfg\seed_attribute_mapping.sql
 :r $(ROOT)\cfg\seed_zone_code_mapping.sql
 
-PRINT '==== 4/4  SQL Agent Job =========================';
+PRINT '==== 4/4  Context d execucio i SQL Agent Job ====';
+/* Abans del job: el pas corre com a gapi07_etl i sense l'usuari falla. */
+:r $(ROOT)\security\create_etl_user.sql
 :r $(ROOT)\jobs\sqlagent_analitza_etl_daily.sql
 
 PRINT '==== Deploy complete. ===========================';

@@ -1,6 +1,18 @@
 # Deploy IntercanviSAP via PowerShell (sqlcmd no esta instal.lat en aquest sistema).
 # Executa els fitxers .sql en l'ordre correcte, dividint per batches "GO".
 #
+# AQUESTA LLISTA HA DE COINCIDIR AMB sql\deploy.sql. Son el mateix desplegament
+# per dos camins, i el 31/08/2026 havien divergit: aqui faltaven 04_migracions
+# (el discount es quedava a decimal(5,2) i formula_break hauria saltat cada nit),
+# etl_vw_kais_codes (les tres vistes, sense les quals els cinc SP que hi fan JOIN
+# ni tan sols es creen) i el job de SQL Agent. Com que sqlcmd no esta instal.lat,
+# qui munti la productiva al novembre fara servir AQUEST fitxer: si tornen a
+# divergir, la que quedara mal desplegada es la productiva.
+#
+# NO inclou schema\01_create_database.sql: fa DROP de les vuit dbo.est_* i es
+# creacio inicial, no desplegament. Els canvis d'esquema sobre una BD viva van a
+# schema\04_migracions.sql, que si que hi es.
+#
 # La contrasenya NO va aqui (Regla 03). Passa-la per variable d'entorn:
 #     $env:SQLPASS = Read-Host 'Password' -AsSecureString | ConvertFrom-SecureString -AsPlainText
 #     .\deploy_via_powershell.ps1
@@ -18,8 +30,10 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $files = @(
-    "$Root\schema\01_create_database.sql",
     "$Root\schema\02_create_sap_raw.sql",
+    "$Root\schema\04_migracions.sql",
+    # Les vistes primer: els SP de sota hi fan JOIN i no es crearien.
+    "$Root\procs\etl_vw_kais_codes.sql",
     "$Root\procs\etl_sp_load_product_categories.sql",
     "$Root\procs\etl_sp_load_salesmen.sql",
     "$Root\procs\etl_sp_load_clients.sql",
@@ -33,7 +47,10 @@ $files = @(
     "$Root\procs\etl_sp_run_all.sql",
     "$Root\cfg\seed_country_code_overrides.sql",
     "$Root\cfg\seed_attribute_mapping.sql",
-    "$Root\cfg\seed_zone_code_mapping.sql"
+    "$Root\cfg\seed_zone_code_mapping.sql",
+    # Abans del job: el seu pas corre com a gapi07_etl i sense l'usuari falla.
+    "$Root\security\create_etl_user.sql",
+    "$Root\jobs\sqlagent_analitza_etl_daily.sql"
 )
 
 if ([string]::IsNullOrWhiteSpace($User)) {
