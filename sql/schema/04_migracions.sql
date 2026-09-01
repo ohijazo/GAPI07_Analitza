@@ -83,3 +83,9 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUB
     INSERT cfg.settings ([key], [value], description)
     VALUES ('DISCOUNT_AS_PERCENT_PUBLISHED', '0', 'Amb quina convencio de discount es va publicar dbo.est_linies_albara per ultim cop. L escriu sp_swap_staging_to_prod dins de la transaccio del swap i NO es toca a ma: si no coincideix amb DISCOUNT_AS_PERCENT, sp_load_invoice_lines forca un FULL en comptes de copiar de dbo linies en l altra convencio.');
 GO
+
+/* 2026-09-01 - check history_floor. Veure el capcal de sp_data_quality_checks. */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('HISTORY_FLOOR_ENFORCE', '1', 'Atura el swap si la data mes antiga de staging.est_linies_albara es anterior a la de dbo. Analitza reemplaça el seu historic a partir de la data minima que li enviem, aixi que fer-la retrocedir els esborra dades. Nomes es posa a 0 per a un backfill volgut, i es torna a 1 tot seguit.');
+GO

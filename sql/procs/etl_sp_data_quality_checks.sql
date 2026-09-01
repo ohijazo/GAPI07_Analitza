@@ -280,6 +280,71 @@ BEGIN
             SET @CriticalCount = @CriticalCount + 1;
         END
 
+        /* ----- 10) La data mes antiga no pot retrocedir -----
+
+           Aixo no protegeix les NOSTRES dades, protegeix les d'Analitza, i cal
+           saber com carreguen per entendre'l.
+
+           La seva SQL (docs/sql importacio Farinera.sql) filtra
+               DATEDIFF(DAY, date, GETDATE()) <= 90
+           i despres, segons el correu de l'Adria de l'01/09/2026, la seva
+           carrega **reemplaça** el seu historic a partir de la data MINIMA de
+           tot el que els arriba. O sigui que la data mes antiga que publiquem
+           es, literalment, el punt a partir del qual ells esborren.
+
+           Mentre no es mogui cap enrere, no passa res: cada nit reemplacen el
+           mateix tram i el tornen a omplir. El dany es exactament que
+           RETROCEDEIXI. Si un dia publiquem una linia datada abans del que
+           publicavem ahir, ells esborren des d'aquella data i hi posen a sobre
+           nomes el que els hem enviat: el que tinguessin entremig i no els
+           tornem a enviar, el perden.
+
+           Dues maneres que passi, i cap es rebuscada:
+             - la SAP productiva arrenca amb albarans anteriors al tall;
+             - algu posta un albara amb data endarrerida despres del tall, que
+               es operativa normal d'un ERP. El mode incremental el recull per
+               UpdateDate i el publica amb el seu DocDate, que es antic.
+
+           Es CRITICAL i atura el swap. Cap dels altres nou checks mira dates:
+           una linia antiga no es orfe, no trenca la formula, no canvia el signe
+           i no fa minvar el recompte.
+
+           Per que no hi ha cap data configurada: no cal. La referencia es el que
+           vam publicar ahir (dbo), com a vanished_ids. Aixi no depen que ningu
+           reculli un pas del runbook el dia del tall, i el mateix dia del tall
+           la data minima salta cap ENDAVANT -de l'historic de KAIS al 2 de
+           novembre-, que es un moviment permes.
+
+           HISTORY_FLOOR_ENFORCE existeix per a l'unic cas legitim: un backfill
+           volgut d'historic mes antic. Es posa a '0', es fa, i es torna a '1'. -----*/
+        DECLARE @enforce_floor bit = 1;
+        SELECT @enforce_floor = ISNULL(TRY_CAST([value] AS bit), 1)
+        FROM   cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE';
+
+        DECLARE @min_before datetime, @min_now datetime;
+        SELECT @min_before = MIN([date]) FROM dbo.est_linies_albara;
+        SELECT @min_now    = MIN([date]) FROM staging.est_linies_albara;
+
+        IF @enforce_floor = 1 AND @min_before IS NOT NULL AND @min_now IS NOT NULL
+           AND @min_now < @min_before
+        BEGIN
+            DECLARE @floor_detail nvarchar(max) =
+                'La data mes antiga ha passat de ' + CONVERT(varchar(10), @min_before, 23)
+                + ' a ' + CONVERT(varchar(10), @min_now, 23)
+                + '. Analitza reemplaça el seu historic a partir de la data minima que li enviem, '
+                + 'aixi que publicar aixo els esborraria el que tinguin entre les dues dates. Swap avortat. '
+                + 'Linies afectades: ';
+            SELECT TOP 10 @floor_detail = @floor_detail
+                   + CAST(id_invoice_line AS varchar(20)) + '=' + CONVERT(varchar(10), [date], 23) + ' '
+            FROM   staging.est_linies_albara
+            WHERE  [date] < @min_before
+            ORDER BY [date];
+
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'history_floor', 'CRITICAL', @floor_detail);
+            SET @CriticalCount = @CriticalCount + 1;
+        END
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),
