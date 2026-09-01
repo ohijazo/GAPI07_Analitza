@@ -21,7 +21,7 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 | **Adrià (Analitza)** | Les respostes del correu enviat el **31/08/2026** (`resposta_adria_2.docx`). Sense la del `/100`, el pas 2.4 no es pot escriure |
 | **Sistemes** | Worker desplegat a `AE01SAPRDP` i ruta oberta a les IPs d'Analitza |
 | **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |
-| **Consultors de SAP** | Confirmar que la productiva arrenca **sense** històric d'albarans. Tot el raonament del pas 2.3 hi penja i ningú ho ha verificat |
+| ~~Consultors de SAP~~ | ✅ **Resolt l'01/09/2026**: el blueprint signat (cap. 17.3) diu que **no es migra l'històric documental**. Veure sota |
 | **Nosaltres** | Res. La contrasenya d'`analitza_ro` es va rotar el 31/08/2026; passar-la-hi depèn que Sistemes obri la ruta |
 
 ---
@@ -113,8 +113,21 @@ UPDATE IntercanviSAP.cfg.settings SET [value] = '0.00' WHERE [key] = 'LINES_MIN_
 ```
 
 La SAP productiva arrenca **sense albarans anteriors al tall**, així que `est_linies_albara` cau a
-gairebé zero i `lines_collapsed` bloquejaria el swap. Aquest pas depèn de la confirmació dels
-consultors de SAP: si resultés que la productiva sí que porta històric, no cal tocar-ho.
+gairebé zero i `lines_collapsed` bloquejaria el swap. **Aquest pas és obligatori, no una precaució**:
+confirmat l'01/09/2026 contra el blueprint signat, capítol 17.3, *«No se migrará el histórico
+documental»*.
+
+El que sí que es migra: mestres, **stock inicial** valorat i amb lots, i les **factures pendents de
+cobrament** com a factures de servei sense efecte fiscal, amb el número, la data, l'import i el
+venciment originals de KAIS. Aquelles són `OINV` obertes i entraran a `est_cobraments` amb data
+anterior al tall, que és el que evita que el deute dels clients sembli haver desaparegut el dia 2.
+
+Dos fets operatius que se'n deriven i que val la pena tenir presents:
+
+- **Els albarans pendents de facturar es puntegen i es facturen tots a KAIS abans del tall**, perquè
+  l'stock quedi quadrat a l'entorn antic. O sigui que no arriben albarans a mig facturar a SAP.
+- **KAIS es manté viu com a plataforma de consulta.** És el que fa possible la càrrega puntual del
+  desembre per corregir el cost d'octubre: la base de dades antiga hi serà.
 
 ### 2.4 El `discount` i el `/100` — el canvi coordinat
 

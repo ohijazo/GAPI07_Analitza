@@ -58,10 +58,13 @@ nosaltres. **El tram de KAIS que hi hagi entremig el perdríeu.**
 
 Hi ha dues maneres que passi, i cap és rebuscada:
 
-1. Que la nostra SAP productiva arrenqui amb albarans anteriors al tall. Ho estic verificant, però
-   encara no en tinc confirmació.
+1. Que la nostra SAP productiva arrenqui amb albarans anteriors al tall. **Aquesta te la puc
+   descartar**: ho diu el blueprint signat del projecte. No es migra històric documental —ni
+   albarans, ni comandes, ni factures— i els albarans pendents de facturar es tanquen tots al
+   sistema antic abans del tall.
 2. Que algú posti un albarà **amb data endarrerida** després del tall: entrar el dia 10 de novembre
    un albarà datat el 20 d'octubre. Això és operativa normal d'un ERP i passarà tard o d'hora.
+   Aquesta és la que queda oberta.
 
 Ho he tapat pel nostre costat: si un dia la data més antiga que publicaríem és anterior a la del dia
 abans, la càrrega s'atura i no us arriba res, en comptes de publicar-la i que la ingeriu. Preferim
@@ -106,6 +109,24 @@ o si ho porteu vosaltres.
 De propina, una cosa petita: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si fossin dues famílies
 diferents. La segona té un sol article. Ho corregim aquí abans del tall.
 
+## Dues preguntes petites
+
+**Feu servir `est_cobraments`?** Us l'omplim cada nit, però no surt ni a les SQL que em vas passar, ni
+a la teva llista de camps del maig, ni a la definició de GAPI07 del blueprint. Ho pregunto perquè
+pel nostre costat hi ha una alarma que atura la publicació sencera si aquella taula queda buida, i si
+resulta que no la mireu, estaríem bloquejant les dades que sí que useu per una que no. Si no la
+feu servir, li baixo la severitat.
+
+Relacionat: el deute pendent dels vostres clients **sí que us arribarà** el dia 2. A SAP les factures
+pendents es migren com a factures de servei amb el número i la data originals de KAIS, i nosaltres
+les recollim. Sense això, el dia 2 el deute hauria semblat esfumar-se.
+
+**L'històric de 5 anys.** La definició de GAPI07 del nostre blueprint demana entre 5 i 10 anys
+d'històric a `invoice_lines`, i el mateix document diu que a SAP no s'hi migra cap històric
+documental. Entenc, pel que m'has explicat de com carregueu, que això no és un problema per a
+vosaltres perquè l'històric que ja teniu ingerit no el perdeu. T'ho dic per si de cas ho havies donat
+per fet d'una altra manera.
+
 ## El cost i la connexió
 
 - **El cost d'octubre**: d'acord, queda amb el cost del moment i al desembre fem la càrrega puntual
@@ -130,10 +151,13 @@ ohijazo@agrienergia.com
 > - `U_SEIFamCialCat` afegit al `$select` i a la sonda, amb cobertura sobre el cens i sobre els
 >   actius.
 >
-> **El que depèn de tercers i no s'ha mogut:** desplegar el Worker i obrir la ruta (Sistemes), la
-> llicència de l'usuari tècnic de SAP, i si la productiva arrenca amb històric d'albarans
-> (consultors). Aquest últim ara té dues conseqüències, no una: el cost d'octubre **i** la data
-> mínima. Si arrenca amb històric, la seva càrrega li esborra el tram corresponent de KAIS.
+> **La productiva arrenca sense històric d'albarans: TANCAT l'01/09/2026** contra el blueprint
+> signat, cap. 17.3. Amb això, `LINES_MIN_RATIO` s'ha d'abaixar el dia 2 obligatòriament, la data
+> mínima serà el 2 de novembre, i `est_cobraments` no quedarà buida perquè les factures de servei
+> són `OINV` obertes.
+>
+> **El que depèn de tercers i no s'ha mogut:** desplegar el Worker i obrir la ruta (Sistemes) i la
+> llicència de l'usuari tècnic de SAP.
 >
 > **Els 782 articles actius sense família** són una feina de classificació que no és nostra, i té
 > data. Si l'Olga tria l'opció B sense que això es faci, el dia 2 vuit de cada deu articles li surten

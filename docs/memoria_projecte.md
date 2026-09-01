@@ -780,6 +780,58 @@ tres bloquegen feina nostra amb data 1 de novembre:
   dona la volta dues vegades. Els passos del dia són a **`docs/runbook_cutover.md`**.
 - **Refresc de `DB_FARINERA_TEST` des de productiva**, per poder validar de debò.
 
+### La productiva arrenca sense històric d'albarans — TANCAT l'01/09/2026
+
+Va estar setmanes com a suposició de la qual penjava tot el raonament del cost d'octubre. Ho respon
+el **blueprint signat** (`BluPrint_GAPs\Blueprint Estandar - Coromina v14 revisat_signat.pdf`),
+capítol 17.3:
+
+> «La migración a SAP Business One se centrará en trasladar únicamente los datos necesarios para
+> garantizar la continuidad operativa [...] a partir de la fecha de corte. **No se migrará el
+> histórico documental.**»
+
+No es migren albarans (ni de compra ni de venda), ni comandes, ni factures, ni moviments històrics
+d'stock o comptabilitat. Sí que es migren:
+
+- **Mestres**: clients, proveïdors, articles i famílies, condicions comercials, adreces, contactes.
+- **Stock inicial** a la data de tall, valorat i amb detall de lot.
+- **Factures pendents de cobrament**, com a **factures de servei** sense efecte fiscal, amb el
+  número, data, import, venciment i client originals de KAIS.
+
+Tres conseqüències per a nosaltres:
+
+1. **`LINES_MIN_RATIO` s'ha d'abaixar el dia 2.** Deixa de ser una precaució.
+2. **La data mínima serà el 2 de novembre**, com suposava l'Adrià, així que la seva càrrega no
+   esborrarà res de l'històric de KAIS. El risc que queda són els albarans amb data endarrerida
+   posats després del tall, que és el que cobreix el check `history_floor`.
+3. **`est_cobraments` no quedarà buida el dia 2**: les factures de servei són `OINV` obertes i
+   `sp_load_receivables` les recull. Sense això, el deute dels clients hauria semblat desaparèixer.
+
+I dos fets operatius: els albarans pendents de facturar **es facturen tots a KAIS abans del tall**
+perquè l'stock quedi quadrat, i **KAIS es manté viu com a plataforma de consulta** — que és el que
+fa possible la càrrega puntual del desembre per corregir el cost d'octubre.
+
+### El blueprint es contradiu ell mateix sobre l'històric
+
+La definició de GAPI07 (pàg. 195, `invoice_lines.csv`) diu: *«Se debe incluir un mínimo de 5 años de
+histórico y un máximo de 10»*. El capítol 17.3 del mateix document diu que no es migra històric
+documental. **Les dues no poden ser certes alhora.**
+
+A la pràctica se'n surt, perquè Analitza ja té l'històric de KAIS i la seva càrrega no l'esborra
+—reemplaça només a partir de la data mínima que rep—, així que el resultat és correcte. Però si algú
+audita el GAP contra el blueprint, aquella línia constarà com a incomplerta. Val més tenir-ho dit.
+
+### El que el blueprint documenta de GAPI07 no és el que s'ha construït
+
+El GAP defineix **dues taules CSV**, `clients.csv` i `invoice_lines.csv`, amb el **format d'alta
+genèric d'Analitza**. Nosaltres n'omplim vuit, en format KAIS, perquè el contracte real és el que
+Analitza ja tenia i és el que evita que hagin de reescriure cap consulta.
+
+Els camps tampoc coincideixen: la definició porta `product_name`, `product_family_id` i
+`product_family_name` desnormalitzats a les línies i `salesmen_name` als clients, i **no porta
+`product_price`, `product_cost`, `discount` ni `series`**. O sigui que el `/100` i el `product_cost`,
+que han costat dues setmanes, són camps que no surten a la definició signada.
+
 ### Migració
 
 Fases 0 a 4 tancades (§5, §6). Queda:
