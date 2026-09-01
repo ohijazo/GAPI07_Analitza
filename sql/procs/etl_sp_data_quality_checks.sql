@@ -345,6 +345,60 @@ BEGIN
             SET @CriticalCount = @CriticalCount + 1;
         END
 
+        /* ----- 11) Adreces de ship-to sense numero congelat (CRITICAL) -----
+
+           etl.vw_client_ship fa INNER JOIN amb cfg.client_ship_no, aixi que una
+           adreça sense numero no surt de la vista i el seu client_location no
+           arriba a Analitza. Que desaparegui es preferible a inventar-li un
+           numero, pero s'ha de veure: normalment vol dir que
+           sp_assign_client_ship_no no ha corregut. -----*/
+        SELECT @cnt = COUNT(*)
+        FROM   sap_raw.CRD1 AS a
+        WHERE  a.AdresType = 'S'
+          AND  NOT EXISTS (SELECT 1 FROM cfg.client_ship_no AS f
+                           WHERE f.CardCode = a.CardCode AND f.LineNum = a.LineNum);
+        IF @cnt > 0
+        BEGIN
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'ship_no_missing', 'CRITICAL',
+                    'Adreces de ship-to a sap_raw.CRD1 sense numero a cfg.client_ship_no: '
+                    + CAST(@cnt AS varchar(20))
+                    + '. No surten de etl.vw_client_ship i els seus client_locations no arribarien a '
+                    + 'Analitza. Ha corregut etl.sp_assign_client_ship_no? Swap avortat.');
+            SET @CriticalCount = @CriticalCount + 1;
+        END
+
+        /* ----- 12) El nom de l'adreça ha canviat sota un numero congelat (WARN) -----
+
+           El numero es congela per (CardCode, LineNum). Si SAP reutilitzes un
+           LineNum per a una adreça DIFERENT, l'historic de la vella cauria sobre
+           la nova, que es exactament el que aquesta taula evita. No es pot
+           distingir d'un canvi de nom legitim -corregir una falta-, aixi que
+           avisa i no bloqueja: qui ho miri ho sabra. -----*/
+        SELECT @cnt = COUNT(*)
+        FROM   cfg.client_ship_no AS f
+        INNER JOIN sap_raw.CRD1 AS a
+               ON a.CardCode = f.CardCode AND a.LineNum = f.LineNum AND a.AdresType = 'S'
+        WHERE  ISNULL(f.[Address], '') <> ISNULL(a.[Address], '');
+        IF @cnt > 0
+        BEGIN
+            DECLARE @addr_detail nvarchar(max) =
+                'Adreces on el nom ha canviat sense canviar de numero: ' + CAST(@cnt AS varchar(20))
+                + '. Si es un canvi de nom, correcte; si SAP ha reutilitzat el LineNum per a una '
+                + 'adreça diferent, l historic d albarans cauria sobre la nova. ';
+            SELECT TOP 10 @addr_detail = @addr_detail
+                   + f.CardCode + '/' + CAST(f.ship_no AS varchar(10)) + ': '''
+                   + ISNULL(f.[Address], '') + ''' -> ''' + ISNULL(a.[Address], '') + ''' '
+            FROM   cfg.client_ship_no AS f
+            INNER JOIN sap_raw.CRD1 AS a
+                   ON a.CardCode = f.CardCode AND a.LineNum = f.LineNum AND a.AdresType = 'S'
+            WHERE  ISNULL(f.[Address], '') <> ISNULL(a.[Address], '')
+            ORDER BY f.CardCode, f.ship_no;
+
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'ship_address_changed', 'WARN', @addr_detail);
+        END
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),

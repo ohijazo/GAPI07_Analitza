@@ -72,6 +72,10 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
       Si no ha contestat, aquí és on s'atura i s'hi insisteix; és l'únic punt que produeix un error
       silenciós.
 - [ ] Deixar apuntada la sortida de l'últim run bo, per tenir contra què comparar l'endemà.
+- [ ] **Comprovar que `cfg.client_ship_no` està poblada** i que `ship_no_missing` no salta. És la
+      taula que fixa la meitat dreta de `id_client_location`, i **no es pot regenerar**: si es perd,
+      tots els números es recalculen i Analitza veu desaparèixer ubicacions i néixer-ne de noves amb
+      l'històric d'una altra. Ha d'entrar al backup.
 
 ---
 

@@ -522,12 +522,27 @@ ara ho diu explícitament.
 
 Resolt amb `etl.vw_client_ship` (`ROW_NUMBER() OVER (PARTITION BY CardCode ORDER BY LineNum) - 1`).
 
-**El que costa:** si algú esborra una adreça de ship-to a SAP, totes les posteriors del mateix client
-es renumeren, i per a Analitza això són ubicacions que desapareixen i ubicacions noves amb l'històric
-buit. `vanished_ids` ho detecta l'endemà, però ho detecta, no ho evita. La solució estable és
-congelar el número per (client, adreça) en una taula al tall i fer servir la seqüència només per a
-les adreces noves. **Pendent de decidir**; mentrestant això és correcte per al 99,1% i el que hi
-havia ho era per al 6%.
+**El que costava, i com s'ha tancat (01/09/2026).** Amb el número calculat al vol, esborrar una
+adreça renumerava totes les posteriors del mateix client. L'Adrià va explicar que al seu costat això
+no deixa un forat: quan deixa d'arribar-los un `client_location` l'esborren de l'aplicació **però
+mantenen l'històric d'albarans**, i si més endavant neix una adreça amb aquell número, se l'emporta
+tot. O sigui que renumerar **enganxa l'històric d'una adreça a una altra** — un client veuria compres
+que no ha fet — i totes les xifres quadren amb elles mateixes.
+
+Ara el número viu a **`cfg.client_ship_no`**, que l'assigna `etl.sp_assign_client_ship_no` una sola
+vegada i no el torna a tocar. Les adreces noves agafen `max+1` del seu client, així que un número
+alliberat per un esborrat **no es reutilitza mai**.
+
+La clau és `(CardCode, LineNum)` i no `(CardCode, Address)`: el `LineNum` de SAP no es renumera quan
+s'esborra una germana —per això hi ha forats—, mentre que amb el nom de l'adreça, esborrar-ne una i
+crear-ne una altra amb el mateix nom reutilitzaria el número, que és justament el que s'evita.
+
+Provat: la primera execució reprodueix **exactament** els 5.651 identificadors d'avui (0 desapareguts,
+0 nous), esborrar l'adreça del mig deixa la següent al seu número, i una alta nova agafa el següent
+lliure i no el buit.
+
+⚠️ **`cfg.client_ship_no` no és una taula derivada**: és estat que no es pot regenerar. Si es perd,
+tots els números es recalculen. Ha d'entrar al backup i no l'ha de truncar ningú.
 
 ### 6.6 Resultat de la implementació del COALESCE (28\08\2026)
 

@@ -89,3 +89,29 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('HISTORY_FLOOR_ENFORCE', '1', 'Atura el swap si la data mes antiga de staging.est_linies_albara es anterior a la de dbo. Analitza reemplaça el seu historic a partir de la data minima que li enviem, aixi que fer-la retrocedir els esborra dades. Nomes es posa a 0 per a un backfill volgut, i es torna a 1 tot seguit.');
 GO
+
+/* 2026-09-01 - congelar el numero d'adreça (correu de l'Adria del 01/09). */
+/* -------------------------------------------------------------------------
+   cfg.client_ship_no - la meitat dreta de id_client_location, congelada
+
+   NO ES UNA TAULA DERIVADA: es estat que no es pot regenerar. Si es perd, tots
+   els numeros d'adreça es recalculen i Analitza veu desapareixer ubicacions i
+   neixer-ne de noves amb l'historic d'una altra. Ha d'entrar al backup i no
+   l'ha de truncar mai ningu.
+
+   L'omple etl.sp_assign_client_ship_no a cada execucio de l'ETL, nomes
+   afegint. Veure el capcal d'aquell procediment per al perque.
+   ------------------------------------------------------------------------- */
+IF OBJECT_ID('cfg.client_ship_no') IS NULL
+CREATE TABLE cfg.client_ship_no (
+    CardCode   nvarchar(15)  NOT NULL,
+    LineNum    int           NOT NULL,
+    ship_no    int           NOT NULL,
+    [Address]  nvarchar(50)  NULL,
+    frozen_at  datetime2(3)  NOT NULL CONSTRAINT DF_cfg_client_ship_no_frozen DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_cfg_client_ship_no PRIMARY KEY CLUSTERED (CardCode, LineNum),
+    /* Dues adreces del mateix client no poden compartir numero: si passes,
+       dos id_client_location diferents col.lapsarien en un. */
+    CONSTRAINT UQ_cfg_client_ship_no UNIQUE (CardCode, ship_no)
+);
+GO

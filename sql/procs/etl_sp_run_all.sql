@@ -75,6 +75,12 @@ BEGIN
     END
 
     BEGIN TRY
+        /* Primer de tot: numerar les adreces noves. etl.vw_client_ship llegeix
+           el numero de cfg.client_ship_no i fa INNER JOIN, aixi que una adreça
+           sense numero no arribaria a Analitza. Ha d'anar abans de qualsevol SP
+           que faci servir la vista. */
+        EXEC etl.sp_assign_client_ship_no   @RunId = @RunId;
+
         EXEC etl.sp_load_product_categories @RunId = @RunId;
         EXEC etl.sp_load_salesmen           @RunId = @RunId;
         EXEC etl.sp_load_clients            @RunId = @RunId;

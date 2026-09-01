@@ -66,25 +66,32 @@ GO
    demostrava es que BPAddress.RowNum == CRD1.LineNum, no que cap dels dos fos
    el numero que KAIS va donar a Analitza.
 
-   ATENCIO — el que aixo compra i el que costa:
-   Si algu ESBORRA una adreca de ship-to a SAP, totes les posteriors del mateix
-   client es renumeren, i per a Analitza aixo son ubicacions que desapareixen i
-   ubicacions noves que neixen amb l'historic buit. El check vanished_ids ho
-   detecta l'endema, pero ho detecta, no ho evita. La solucio estable seria
-   congelar el numero per (client, adreca) en una taula al tall i fer servir la
-   seqüencia nomes per a les adreces noves; queda pendent de decidir amb
-   Analitza. Mentrestant aixo es correcte per al 99,1% dels clients i el que hi
-   havia ho era per al 6%.
+   EL NUMERO JA NO ES CALCULA, ES LLEGEIX (01/09/2026)
+   ---------------------------------------------------
+   Calcular-lo al vol amb ROW_NUMBER() feia que esborrar una adreça renumeres
+   totes les posteriors del mateix client. L'Adria va explicar que aixo, al seu
+   costat, no deixa un forat sino que **enganxa l'historic d'una adreça a una
+   altra**: quan deixa d'arribar-los un client_location l'esborren de
+   l'aplicacio pero mantenen l'historic d'albarans, i si mes endavant neix una
+   adreça amb aquell numero, se l'emporta tot.
+
+   Ara el numero viu a cfg.client_ship_no, que l'assigna una sola vegada i no
+   el torna a tocar (etl.sp_assign_client_ship_no).
+
+   INNER JOIN a proposit: una adreça sense numero congelat NO ha de sortir amb
+   un numero inventat. Que desaparegui es visible -el check ship_no_missing la
+   caça i vanished_ids tambe-, mentre que inventar-lo seria silencios i
+   trencaria justament el que aixo protegeix.
    ========================================================================= */
 CREATE OR ALTER VIEW etl.vw_client_ship
 AS
 SELECT  a.CardCode,
         a.LineNum,
         a.[Address],
-        /* -1 perque la primera adreca ha de ser 000, com a KAIS. ORDER BY
-           LineNum es determinista: (CardCode, LineNum) es la clau primaria. */
-        ship_no = ROW_NUMBER() OVER (PARTITION BY a.CardCode ORDER BY a.LineNum) - 1
+        f.ship_no
 FROM    sap_raw.CRD1 AS a
+INNER JOIN cfg.client_ship_no AS f
+        ON f.CardCode = a.CardCode AND f.LineNum = a.LineNum
 WHERE   a.AdresType = 'S';
 GO
 

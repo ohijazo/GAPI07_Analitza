@@ -31,6 +31,7 @@ PRINT '==== 1/4  Schema =================================';
 PRINT '==== 2/4  Stored procedures =====================';
 /* Les vistes primer: els SP de sota hi fan JOIN. */
 :r $(ROOT)\procs\etl_vw_kais_codes.sql
+:r $(ROOT)\procs\etl_sp_assign_client_ship_no.sql
 :r $(ROOT)\procs\etl_sp_load_product_categories.sql
 :r $(ROOT)\procs\etl_sp_load_salesmen.sql
 :r $(ROOT)\procs\etl_sp_load_clients.sql
