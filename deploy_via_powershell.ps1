@@ -34,6 +34,7 @@ $files = @(
     "$Root\schema\04_migracions.sql",
     # Les vistes primer: els SP de sota hi fan JOIN i no es crearien.
     "$Root\procs\etl_vw_kais_codes.sql",
+    "$Root\procs\etl_sp_assign_client_ship_no.sql",
     "$Root\procs\etl_sp_load_product_categories.sql",
     "$Root\procs\etl_sp_load_salesmen.sql",
     "$Root\procs\etl_sp_load_clients.sql",
