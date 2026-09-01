@@ -417,19 +417,63 @@ internal sealed class ProbeService
         // Analitza no fa servir com a "familia" el que SAP en diu ItemGroup: el
         // que tenen a est_families_productes son categories comercials
         // ("TRADICIONALS", "KM0", "ECOLOGIQUES"), no classes de materia primera
-        // ("BLAT SUPER FORCA"). El candidat a portar-les es U_SEISubFamCialCat,
-        // que es el que ja alimenta est_atributs_producte.subfamily_description.
-        // Aixo llista els valors reals perque es pugui contrastar amb la seva
-        // llista abans de decidir on ha d'anar cada taxonomia.
-        var subfams = items
-            .GroupBy(i => (i.U_SEISubFamCialCat ?? "").Trim())
-            .OrderByDescending(g => g.Count())
+        // ("BLAT SUPER FORCA").
+        //
+        // I son DOS nivells, no un. La seva resposta de l'01/09/2026 ho va
+        // destapar: tenen FAMILIA (12 valors) i SUBFAMILIA (20). El que llegim
+        // avui es U_SEISubFamCialCat, que pel nom i pels valors es el segon; el
+        // primer viu a U_SEIFamCialCat, que existeix al $metadata i no el
+        // miravem. Sense saber com estan poblats els dos camps, la pregunta de
+        // quina taxonomia va a est_families_productes no es pot contestar:
+        // Analitza recomana no passar de ~25 families i SAP en te 110.
+        ReportTaxonomy(report, items, "U_SEIFamCialCat", i => i.U_SEIFamCialCat);
+        ReportTaxonomy(report, items, "U_SEISubFamCialCat", i => i.U_SEISubFamCialCat);
+    }
+
+    /// <summary>
+    /// Quants valors diferents te un camp de classificacio i quants articles es
+    /// queden sense.
+    ///
+    /// Ho dona dues vegades: sobre el cens sencer i sobre els articles ACTIUS.
+    /// La segona xifra es la que decideix, perque el cens porta anys d'articles
+    /// donats de baixa que ningu tornara a classificar i que a Analitza ni hi
+    /// arriben (la seva SQL n'exclou centenars a ma). Un "87% sense familia"
+    /// sobre el cens sencer fa descartar una opcio que potser esta be.
+    ///
+    /// Tambe avisa dels valors que nomes es diferencien per espais o
+    /// majuscules: a SAP son text lliure, i 'KM0' i 'KM 0' hi conviuen sense
+    /// que res es queixi. A Analitza serien dues families, una amb un article.
+    /// </summary>
+    private static void ReportTaxonomy(
+        StringBuilder report, List<ItemRow> items, string field, Func<ItemRow, string?> pick)
+    {
+        static List<IGrouping<string, ItemRow>> Group(IEnumerable<ItemRow> src, Func<ItemRow, string?> p) =>
+            src.GroupBy(i => (p(i) ?? "").Trim()).OrderByDescending(g => g.Count()).ToList();
+
+        var actius = items.Where(i => i.Valid == "tYES" && i.Frozen != "tYES").ToList();
+        var groups = Group(items, pick);
+        var groupsActius = Group(actius, pick);
+
+        static int Buits(List<IGrouping<string, ItemRow>> g) =>
+            g.FirstOrDefault(x => x.Key.Length == 0)?.Count() ?? 0;
+
+        report.AppendLine($"   {field}: {groups.Count(g => g.Key.Length > 0)} valors diferents");
+        report.AppendLine($"      sense classificar, cens sencer : {Buits(groups)} de {items.Count}");
+        report.AppendLine($"      sense classificar, nomes ACTIUS: {Buits(groupsActius)} de {actius.Count}");
+
+        // Text lliure: dos valors que nomes difereixen en espais o majuscules
+        // son la mateixa cosa per a qui els va escriure i dues families per a
+        // Analitza. Val mes veure-ho aqui que a la seva aplicacio.
+        var collisions = groups.Where(g => g.Key.Length > 0)
+            .GroupBy(g => g.Key.Replace(" ", "").ToUpperInvariant())
+            .Where(c => c.Count() > 1)
             .ToList();
-        var sensesubfam = subfams.FirstOrDefault(g => g.Key.Length == 0)?.Count() ?? 0;
-        report.AppendLine($"   U_SEISubFamCialCat: {subfams.Count(g => g.Key.Length > 0)} valors diferents, " +
-                          $"{sensesubfam} articles sense cap");
-        foreach (var g in subfams.Where(g => g.Key.Length > 0))
-            report.AppendLine($"      '{g.Key}'  ({g.Count()} articles)");
+        foreach (var c in collisions)
+            report.AppendLine($"      >>> valors que son el mateix amb un espai o una majuscula pel mig: " +
+                              string.Join(" / ", c.Select(g => $"'{g.Key}' ({g.Count()})")));
+
+        foreach (var g in groups.Where(g => g.Key.Length > 0))
+            report.AppendLine($"      '{g.Key}'  ({g.Count()} articles, {g.Count(i => i.Valid == "tYES" && i.Frozen != "tYES")} actius)");
     }
 
     /// <summary>

@@ -43,7 +43,7 @@ public static class ODataQueryBuilder
     public static readonly string[] ItemFields =
     {
         "ItemCode", "ItemName", "ItemsGroupCode", "Valid", "Frozen",
-        "SalesUnit", "U_SEISubFamCialCat", "UpdateDate",
+        "SalesUnit", "U_SEIFamCialCat", "U_SEISubFamCialCat", "UpdateDate",
     };
 
     /// <summary>

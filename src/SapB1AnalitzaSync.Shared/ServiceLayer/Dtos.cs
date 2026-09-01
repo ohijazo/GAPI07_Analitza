@@ -74,6 +74,15 @@ public sealed class ItemRow
     public string? Valid { get; set; }
     public string? Frozen { get; set; }
     public string? SalesUnit { get; set; }
+
+    /// <summary>
+    /// Familia comercial. NO es el que avui alimenta est_families_productes,
+    /// que surt de OITB.ItmsGrpCod (110 grups de materia primera). Aquest camp
+    /// es el nivell que Analitza en diu FAMILIA i que en tenen 12; el va
+    /// destapar la seva resposta de l'01/09/2026.
+    /// </summary>
+    public string? U_SEIFamCialCat { get; set; }
+
     public string? U_SEISubFamCialCat { get; set; }
     public DateTime? UpdateDate { get; set; }
 }
