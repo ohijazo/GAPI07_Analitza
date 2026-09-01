@@ -811,30 +811,17 @@ I dos fets operatius: els albarans pendents de facturar **es facturen tots a KAI
 perquè l'stock quedi quadrat, i **KAIS es manté viu com a plataforma de consulta** — que és el que
 fa possible la càrrega puntual del desembre per corregir el cost d'octubre.
 
-### El blueprint es contradiu ell mateix sobre l'històric
+### La secció GAPI07 del blueprint no és el contracte
 
-La definició de GAPI07 (pàg. 195, `invoice_lines.csv`) diu: *«Se debe incluir un mínimo de 5 años de
-histórico y un máximo de 10»*. El capítol 17.3 del mateix document diu que no es migra històric
-documental. **Les dues no poden ser certes alhora.**
+La definició que hi ha a les pàgines 194-195 (`clients.csv` i `invoice_lines.csv`, amb la nota dels
+«5 a 10 anys d'històric») és el **format d'alta genèric d'Analitza**, enganxat al document. No
+descriu aquesta integració: el contracte real són les vuit `est_*` en format KAIS, que és el que
+evita que Analitza hagi de reescriure cap consulta.
 
-A la pràctica se'n surt, perquè Analitza ja té l'històric de KAIS i la seva càrrega no l'esborra
-—reemplaça només a partir de la data mínima que rep—, així que el resultat és correcte. Però si algú
-audita el GAP contra el blueprint, aquella línia constarà com a incomplerta. Val més tenir-ho dit.
+**No s'ha de fer servir com a referència ni per validar l'abast.** Si hi apareix una discrepància
+—camps que no hi surten, un històric que no es pot complir— no és un problema a resoldre.
 
-### El que el blueprint documenta de GAPI07 no és el que s'ha construït
-
-El GAP defineix **dues taules CSV**, `clients.csv` i `invoice_lines.csv`, amb el **format d'alta
-genèric d'Analitza**. Nosaltres n'omplim vuit, en format KAIS, perquè el contracte real és el que
-Analitza ja tenia i és el que evita que hagin de reescriure cap consulta.
-
-Els camps tampoc coincideixen: la definició porta `product_name`, `product_family_id` i
-`product_family_name` desnormalitzats a les línies i `salesmen_name` als clients, i **no porta
-`product_price`, `product_cost`, `discount` ni `series`**. O sigui que el `/100` i el `product_cost`,
-que han costat dues setmanes, són camps que no surten a la definició signada.
-
-### Migració
-
-Fases 0 a 4 tancades (§5, §6). Queda:
+El que sí que val del blueprint és el capítol 17, de dalt.
 
 - **Configurar el Worker per al compte de SQL Agent**, o el job seguirà fallant cada nit (§5).
 - **Fase 5 — replantejada el 26/08 i tancada a mitges el 31/08.** Els usuaris de

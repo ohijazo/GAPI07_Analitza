@@ -109,10 +109,10 @@ o si ho porteu vosaltres.
 De propina, una cosa petita: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si fossin dues famílies
 diferents. La segona té un sol article. Ho corregim aquí abans del tall.
 
-## Dues preguntes petites
+## Una pregunta petita
 
-**Feu servir `est_cobraments`?** Us l'omplim cada nit, però no surt ni a les SQL que em vas passar, ni
-a la teva llista de camps del maig, ni a la definició de GAPI07 del blueprint. Ho pregunto perquè
+**Feu servir `est_cobraments`?** Us l'omplim cada nit, però no surt ni a les SQL que em vas passar ni
+a la teva llista de camps del maig. Ho pregunto perquè
 pel nostre costat hi ha una alarma que atura la publicació sencera si aquella taula queda buida, i si
 resulta que no la mireu, estaríem bloquejant les dades que sí que useu per una que no. Si no la
 feu servir, li baixo la severitat.
@@ -120,12 +120,6 @@ feu servir, li baixo la severitat.
 Relacionat: el deute pendent dels vostres clients **sí que us arribarà** el dia 2. A SAP les factures
 pendents es migren com a factures de servei amb el número i la data originals de KAIS, i nosaltres
 les recollim. Sense això, el dia 2 el deute hauria semblat esfumar-se.
-
-**L'històric de 5 anys.** La definició de GAPI07 del nostre blueprint demana entre 5 i 10 anys
-d'històric a `invoice_lines`, i el mateix document diu que a SAP no s'hi migra cap històric
-documental. Entenc, pel que m'has explicat de com carregueu, que això no és un problema per a
-vosaltres perquè l'històric que ja teniu ingerit no el perdeu. T'ho dic per si de cas ho havies donat
-per fet d'una altra manera.
 
 ## El cost i la connexió
 
