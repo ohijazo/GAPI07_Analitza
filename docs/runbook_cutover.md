@@ -19,10 +19,10 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 | Depèn de | Què falta |
 |---|---|
 | **Adrià (Analitza)** | Les respostes del correu enviat el **31/08/2026** (`resposta_adria_2.docx`). Sense la del `/100`, el pas 2.4 no es pot escriure |
-| **Sistemes** | Worker desplegat a `AE01SAPRDP` i ruta oberta a les IPs d'Analitza |
+| **Sistemes** | Worker desplegat a `AE01SAPRDP` i accés d'Analitza a `AE01SAPSQL` habilitat **per VPN** (no és obrir 1433 a internet — veure `memoria_projecte.md` §9, Bloc A) |
 | **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |
 | ~~Consultors de SAP~~ | ✅ **Resolt l'01/09/2026**: el blueprint signat (cap. 17.3) diu que **no es migra l'històric documental**. Veure sota |
-| **Nosaltres** | Res. La contrasenya d'`analitza_ro` es va rotar el 31/08/2026; passar-la-hi depèn que Sistemes obri la ruta |
+| **Nosaltres** | Res. La contrasenya d'`analitza_ro` es va rotar el 31/08/2026; passar-la-hi depèn que Sistemes els habiliti la VPN |
 
 ---
 
@@ -51,8 +51,9 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    `OITB.U_FCCodiKais` (famílies) **no cal poblar-lo**: l'Adrià accepta que els ids de família
    canviïn. Es queda creat i buit.
 
-4. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes
-   confirmi la ruta. Ja està rotada (31/08/2026) i apuntada al gestor.
+4. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes els
+   hagi habilitat la VPN. Ja està rotada (31/08/2026) i apuntada al gestor. L'endpoint i les
+   credencials de VPN els dona Sistemes, no nosaltres.
 
    El compte només veu `dbo.est_*` (tancat el mateix dia: abans era `db_datareader` de tota la BD i
    arribava al mirall `sap_raw`). Si algun dia cal afegir-hi una taula, va a

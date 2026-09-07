@@ -228,9 +228,14 @@ La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2
 **24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
 notava perquè no havia canviat res.
 
-**Bloquejat**: no tenim accés a `AE01SAPRDP`. El desplegament el fa Sistemes, amb la petició de
-`peticio_sistemes_worker.docx`. Fins llavors el job de les 03:00 avortarà amb
+**Bloquejat**: no tenim accés a `AE01SAPRDP`. Fins llavors el job de les 03:00 avortarà amb
 `ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
+
+⚠️ **A Sistemes no se'ls ha demanat encara.** L'última comunicació és el correu del **15/06/2026**,
+que ells van contestar punt per punt. La petició de l'01/09 (`peticio_sistemes_worker.docx`) **no es
+va enviar mai**, i des del juny tenen una pregunta nostra sense resposta —la del punt 6, amb quin
+compte es fa el Database Mail—, o sigui que la pilota estava aquí, no allà. El correu que s'envia és
+`correu_sistemes_2026-09-07.md`, continuació d'aquell fil.
 
 **Quatre comptes diferents, i els crea gent diferent:**
 
@@ -854,13 +859,31 @@ El que sí que val del blueprint és el capítol 17, de dalt.
 
 ### Del projecte, anteriors a la migració
 
-**Bloc A — Sistemes:** compte SMTP per a Database Mail; obrir el port 1433 per a la IP d'Analitza.
-Són feina d'infraestructura, no de SAP.
+**Bloc A — Sistemes:** compte SMTP per a Database Mail; accés d'Analitza a `AE01SAPSQL`. Són feina
+d'infraestructura, no de SAP.
+
+> ⚠️ **No és obrir el port 1433 a les IP públiques d'Analitza.** Ho vam entendre malament durant
+> mesos. La resposta de Sistemes del **15/06/2026** ho diu: *«Perquè Analitza pugui accedir el
+> servidor de SAPSQL per VPN només m'ho heu de dir i li habilito l'accés»*, i *«si accedeixen des de
+> la VPN el rang serà 192.168.254.x»*. O sigui:
+>
+> - **`192.168.254.x` és el pool de clients de la VPN**, no l'adreça d'`AE01SAPSQL` (que és
+>   `192.168.11.238`, on respon Service Layer). La "contradicció d'IPs" que arrossegàvem no existia.
+> - Analitza **entra per VPN**, com ja feia amb KAIS. `88.99.249.95` i `85.85.181.85` són el seu
+>   origen cap al concentrador, no una IP que hagi d'arribar a 1433 des de fora. **No cal cap regla
+>   de firewall cap a internet.**
+> - El que falta no és una obertura, és **activar-los l'accés i fer-los arribar l'endpoint i les
+>   credencials de VPN** — i això ja ens el van concedir el 15/06. Si torna a encallar-se, és el que
+>   s'ha de citar.
+>
+> La petició de `192.168.11.239` cap a `192.168.11.238` (ports 50000 i 1433) **sí** que és una regla
+> de firewall, però és la del Worker, no la d'Analitza. No barrejar-les.
 
 **Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al
 contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). Queda **passar-li la
-contrasenya per un canal a part** —al correu se li va dir que li arribaria quan hi hagués ruta— i
-confirmar que la seva VPN arriba a `AE01SAPSQL`. Totes dues coses depenen de Sistemes.
+contrasenya per un canal a part** —al correu se li va dir que li arribaria quan tingués accés— i
+**fer-li arribar l'endpoint i les credencials de VPN**, que ha de donar Sistemes. Totes dues coses
+depenen que Sistemes els habiliti l'accés (Bloc A).
 
 **Bloc C — Pendent amb l'Adrià.** Revisat contra els seus correus del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`), tres dels pendents ja tenen resposta o camí:
@@ -922,7 +945,8 @@ SAP arrenca.
 - **Contrasenya d'`analitza_ro` rotada el 31/08/2026** amb
   `sql/security/Rotate-AnalitzaPassword.ps1`, que la demana interactivament, no l'escriu enlloc, i
   **es connecta amb la nova** per comprovar que llegeix `dbo.est_*` i que `sap_raw` li és denegat
-  abans de donar-la per bona. Deixa de bloquejar el handoff; ara depèn que Sistemes obri la ruta.
+  abans de donar-la per bona. Deixa de bloquejar el handoff; ara depèn que Sistemes els habiliti
+  l'accés per VPN (Bloc A).
 
   Rotar un login és una operació de **servidor** i `ohijazo_sql` no hi arriba a propòsit: cal
   `-AdminUser sa`. No se li ha d'afegir `ALTER ANY LOGIN` per estalviar-s'ho — amb aquest permís es

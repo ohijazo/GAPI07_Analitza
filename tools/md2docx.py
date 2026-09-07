@@ -1,6 +1,6 @@
 # Converteix un markdown del projecte a .docx.
 # No es un conversor generic: nomes cobreix el que fem servir aqui
-# (encapcalaments, taules, llistes, negreta i codi inline).
+# (encapcalaments, taules, llistes, negreta, codi inline i blocs ```).
 #
 #   md2docx.py <font.md> <sortida.docx> [--from "<marca>"] [--to "<marca>"]
 #
@@ -97,6 +97,11 @@ in_signature = False
 while i < len(lines):
     line = lines[i].rstrip()
 
+    # La firma s'acaba al primer encapcalament o separador: si no, un annex
+    # despres del comiat sortiria linia a linia, sense taules ni titols.
+    if in_signature and (line.startswith('#') or line.strip() == '---'):
+        in_signature = False
+
     if line.startswith('Salutacions,') or line.startswith('Atentament,'):
         in_signature = True
     if in_signature:
@@ -104,6 +109,19 @@ while i < len(lines):
         if line.strip():
             blocks.append(('sig', line.strip()))
         i += 1
+        continue
+
+    # Els blocs de codi es guarden linia a linia: ajuntar-los com un paragraf
+    # normal convertiria unes comandes per copiar en un text illegible.
+    if line.startswith('```'):
+        close()
+        i += 1
+        code = []
+        while i < len(lines) and not lines[i].startswith('```'):
+            code.append(lines[i].rstrip())
+            i += 1
+        i += 1                      # la marca de tancament
+        blocks.append(('code', code))
         continue
 
     if line.startswith('|') and i + 1 < len(lines) and re.match(r'^\|[\s:-]+\|', lines[i + 1]):
@@ -148,6 +166,16 @@ for kind, content in blocks:
         add_runs(doc.add_paragraph(style='List Bullet'), content)
     elif kind == 'number':
         add_runs(doc.add_paragraph(style='List Number'), content)
+    elif kind == 'code':
+        for ln in content:
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(0)
+            p.paragraph_format.space_before = Pt(0)
+            r = p.add_run(ln if ln.strip() else ' ')
+            r.font.name = 'Consolas'
+            r.font.size = Pt(9)
+            r.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+        doc.add_paragraph()
     elif kind == 'sig':
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(0)
