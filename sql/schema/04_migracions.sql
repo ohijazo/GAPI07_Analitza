@@ -115,3 +115,24 @@ CREATE TABLE cfg.client_ship_no (
     CONSTRAINT UQ_cfg_client_ship_no UNIQUE (CardCode, ship_no)
 );
 GO
+
+/* -------------------------------------------------------------------------
+   2026-09-10 - sap_raw.OCRD.U_FCNewCardCode: fora
+
+   El UDF OCRD.U_FCNewCardCode es va crear a SAP el 26/08/2026 per guardar el
+   client successor en un canvi de rao social. Duplicava U_SEICodienllac, un
+   camp que ja portava la implantacio i que feia exactament aixo (apuntant al
+   reves: guarda el predecessor). S'ha borrat de SAP, el Worker ja no el demana
+   i el new_code surt de etl.vw_client_successor.
+
+   La columna del mirall se'n va aqui i no a 02_create_sap_raw.sql: alla nomes
+   hi ha ALTER ... ADD, i una BD ja desplegada la te creada.
+
+   ORDRE: deploy.sql executa aquest fitxer ABANS dels SPs. Entre el DROP i la
+   recreacio de sp_load_clients hi ha uns segons en que el SP antic referencia
+   una columna que ja no existeix, aixi que no s'ha de desplegar mentre corre
+   el job de les 03:00.
+   ------------------------------------------------------------------------- */
+IF COL_LENGTH('sap_raw.OCRD', 'U_FCNewCardCode') IS NOT NULL
+    ALTER TABLE sap_raw.OCRD DROP COLUMN U_FCNewCardCode;
+GO

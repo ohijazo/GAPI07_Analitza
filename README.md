@@ -178,11 +178,13 @@ P:\GAPI07_Analitza\
       tampoc i no hi ha pont a SAP. Els productes sí. Detall a `docs\memoria_projecte.md` §6.4
 - [ ] Confirmar que pot rebre el codi KAIS com a `id_salesman` (SAP el guarda a `U_FCCodiKais`)
 - [ ] Confirmar que els seus codis de família són el prefix del nom del grup (`010001-BLAT...`)
-- [ ] Crear `U_FCCodiKais` a `OCRD` i `OITB`, i `U_FCNewCardCode` a `OCRD` (feina meva a SAP)
+- [x] Crear `U_FCCodiKais` a `OCRD` i `OITB` (26/08/2026). El `U_FCNewCardCode` que es va crear el
+      mateix dia s'ha retirat: duplicava `U_SEICodienllac`, que ja portava la implantació
 - [ ] Acordar què hi posem a `product_cost` (SAP no exposa l'equivalent de KAIS)
 - [ ] Recollir el **llistat de filtres que aplicava KAIS** — ja se'n va oferir el 12/05/2025
 - [ ] Aclarir si **RAÓ SOCIAL** i **ACTIU** els vol com a atributs (**ZONA** ja el produïm)
-- [ ] Implementar `new_code` amb els UDFs `U_FCKaisCode` / `U_FCNewCardCode` a `OCRD`
+- [x] Implementar `new_code` (10/09/2026): surt de `etl.vw_client_successor`, que **inverteix**
+      `OCRD.U_SEICodienllac` — aquell camp guarda el predecessor, no el successor
 
 **Bloc D — Migració a Service Layer** → veure [§7](#7-migració-a-service-layer-estat)
 

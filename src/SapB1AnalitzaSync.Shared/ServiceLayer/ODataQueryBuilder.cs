@@ -35,9 +35,10 @@ public static class ODataQueryBuilder
         "SalesPersonCode", "PeymentMethodCode", "Phone1", "EmailAddress",
         "U_SEIPOSBC", "U_SEISEGH1", "U_SEISEGH2", "UpdateDate",
         // Continuitat amb KAIS (Regla 04): el codi antic mana sobre el CardCode
-        // a l'hora d'emetre id_client_location, i U_FCNewCardCode porta el
-        // successor quan un client canvia de rao social.
-        "U_FCCodiKais", "U_FCNewCardCode",
+        // a l'hora d'emetre id_client_location. El successor per canvi de rao
+        // social surt de U_SEICodienllac, que ja portava la implantacio: el
+        // U_FCNewCardCode que el projecte havia creat el duplicava i s'ha retirat.
+        "U_FCCodiKais", "U_SEICodienllac",
     };
 
     public static readonly string[] ItemFields =
@@ -123,16 +124,18 @@ public static class ODataQueryBuilder
     public static string BuildCustomersWithLinkCode()
     {
         var q = new QueryStringBuilder();
-        q.Append("$select", "CardCode,CardName,Valid,U_SEICodienllac,U_FCCodiKais,U_FCNewCardCode");
+        q.Append("$select", "CardCode,CardName,Valid,U_SEICodienllac,U_FCCodiKais");
         q.Append("$filter", "CardType eq 'cCustomer'");
         q.Append("$orderby", "CardCode");
         return "BusinessPartners?" + q;
     }
 
     /// <summary>
-    /// Sense els UDFs creats el 26/08/2026. Service Layer es cacheja les
-    /// metadades: fins que no se li reinicia el servei, demanar un UDF acabat
-    /// de crear respon 400 "Property ... is invalid".
+    /// Sense U_FCCodiKais, l'unic UDF que el projecte va crear a OCRD i que per
+    /// tant pot no ser visible encara. Service Layer es cacheja les metadades:
+    /// fins que no se li reinicia el servei, demanar un UDF acabat de crear
+    /// respon 400 "Property ... is invalid". U_SEICodienllac no hi es afectat,
+    /// ve de la implantacio i sempre hi ha estat.
     /// </summary>
     public static string BuildCustomersWithLinkCodeFallback()
     {

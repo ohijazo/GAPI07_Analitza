@@ -108,3 +108,71 @@ SELECT  s.SlpCode,
                      ELSE RIGHT('000' + CAST(s.SlpCode AS varchar(10)), 3) END), 3)
 FROM    sap_raw.OSLP AS s;
 GO
+
+/* -------------------------------------------------------------------------
+   etl.vw_client_successor - el new_code: qui substitueix un client
+
+   D'ON SURT
+   ---------
+   De sap_raw.OCRD.U_SEICodienllac, un camp de la implantacio (Seidor). El
+   projecte havia creat OCRD.U_FCNewCardCode per a aixo mateix sense saber que
+   ja existia; s'ha borrat de SAP i aquesta vista el substitueix.
+
+   EL CAMP APUNTA ENRERE
+   ---------------------
+   Mesurat amb --probe el 10/09/2026 sobre DB_FARINERA_TEST, 160 clients de
+   4.691 el porten informat, i la direccio es inequivoca:
+
+       de client viu a client de baixa : 108
+       de client de baixa a client viu :   2
+
+   O sigui que U_SEICodienllac guarda el PREDECESSOR: el codi del client que
+   aquest ve a substituir. I new_code demana el contrari, el codi NOU. Per aixo
+   la vista INVERTEIX la relacio: el new_code d'un client es el codi de qui
+   l'apunta a ell. Emetre el camp tal qual lligaria l'historic al reves i
+   Analitza acumularia les vendes al registre mort.
+
+   EL VALOR NO VE TAL COM ESTA A L'ALTRA BANDA
+   -------------------------------------------
+   Hi falten els zeros de l'esquerra ('201011' pel client amb U_FCCodiKais
+   '00201011') i la 'C' del CardCode ('211433' per C211433). De les quatre
+   normalitzacions provades a la sonda, la de 8 digits resol 160 de 160 i la de
+   la 'C' 159 de 160; hi son les dues perque despres del tall els clients nous
+   no tindran codi de KAIS i nomes els valdra la segona.
+
+   NOMES POT SORTIR UN SUCCESSOR PER CLIENT
+   ----------------------------------------
+   La inversio no es 1:1: a test hi ha un predecessor amb dos successors
+   (C211608 <- C211534, C301563). Sense el TOP 1 es multiplicarien files a
+   staging.est_clients i hi hauria id_client_location duplicats. Es tria el
+   successor viu, i entre dos de vius el CardCode mes alt (el mes recent). El
+   check new_code_ambiguous de sp_data_quality_checks avisa de cada cas.
+
+   Les cadenes (A substitueix B, que substituia C) s'emeten a un sol salt: el
+   new_code de C es B, no A. A test n'hi ha 20.
+   ------------------------------------------------------------------------- */
+CREATE OR ALTER VIEW etl.vw_client_successor
+AS
+SELECT  pred.CardCode,
+        new_code = LEFT(scc.client_code, 8)
+FROM    sap_raw.OCRD AS pred
+INNER JOIN etl.vw_client_code AS pcc
+        ON pcc.CardCode = pred.CardCode
+CROSS APPLY (
+        SELECT TOP (1) s.CardCode
+        FROM   sap_raw.OCRD AS s
+        WHERE  NULLIF(LTRIM(RTRIM(s.U_SEICodienllac)), '') IS NOT NULL
+          AND  s.CardCode <> pred.CardCode
+          AND  (
+                 /* Nomes s'omplen els zeros si hi caben: amb RIGHT() pelat, un
+                    valor mes llarg de 8 es truncaria i lligaria amb qui no toca. */
+                 CASE WHEN LEN(LTRIM(RTRIM(s.U_SEICodienllac))) <= 8
+                      THEN RIGHT('00000000' + LTRIM(RTRIM(s.U_SEICodienllac)), 8)
+                      ELSE LTRIM(RTRIM(s.U_SEICodienllac)) END = pcc.client_code
+                 OR 'C' + LTRIM(RTRIM(s.U_SEICodienllac)) = RTRIM(pred.CardCode)
+               )
+        ORDER BY CASE WHEN s.validFor = 'Y' THEN 0 ELSE 1 END, s.CardCode DESC
+) AS pick
+INNER JOIN etl.vw_client_code AS scc
+        ON scc.CardCode = pick.CardCode;
+GO

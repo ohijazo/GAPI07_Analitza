@@ -117,3 +117,35 @@ Atentament,
 Oscar Hijazo
 Agrienergia
 ohijazo@agrienergia.com
+
+
+---
+
+## Correcció posterior — 10 de setembre de 2026
+
+**`OCRD.U_FCNewCardCode` es retira. Els camps queden en dos, no en tres.**
+
+El camp per al client successor no calia: `OCRD.U_SEICodienllac`, de la implantació, ja fa aquesta
+funció i el duplicava. El 25 d'agost el vam mirar buscant-hi el codi de l'ERP antic, vam veure que
+només l'omplien 10 clients de 500 i el vam descartar. La lectura era equivocada: no guarda el codi
+antic de cada client, guarda **quin client en substitueix un altre**, i per això només l'omplen els
+qui n'han substituït algun.
+
+Mesurat sobre el cens sencer: 160 clients de 4.691 el porten informat, els 160 resolen contra un
+client existent, i la direcció és clara — 108 van de client viu a client de baixa i només 2 al
+revés. O sigui que apunta al **predecessor**. El procés que alimenta Analitza inverteix la relació
+pel seu compte; no cal tocar cap dada de SAP.
+
+La taula de dalt queda així:
+
+| Taula | Nom del camp | Estat |
+|---|---|---|
+| `OSLP` — Empleats de vendes | `U_FCCodiKais` | Ja existia. No el toco |
+| `OCRD` — Interlocutors comercials | `U_FCCodiKais` | Creat el 26/08/2026 |
+| `OCRD` — Interlocutors comercials | `U_SEICodienllac` | **Ja existia.** No el toco, només el llegeixo |
+| `OITB` — Grups d'articles | `U_FCCodiKais` | Creat el 26/08/2026 |
+
+`OCRD.U_FCNewCardCode` es va crear el 26/08/2026 i mai s'ha omplert (0 clients), de manera que
+esborrar-lo no perd cap dada. El procés de lectura ja no el demana. Un cop esborrat cal **reiniciar
+el Service Layer**, que es cacheja les metadades de la companyia: mentre no es reiniciï, el camp
+segueix als seus metadades tot i no existir a la base de dades.

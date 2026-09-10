@@ -341,18 +341,16 @@ internal sealed class ProbeService
         await foreach (var b in _sl.EnumerateAsync<PartnerRow>(customersUrl, ct).ConfigureAwait(false))
             bps.Add(b);
 
-        var withLink = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_SEICodienllac)).ToList();
         var bpWithKais = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCCodiKais)).ToList();
-        var bpWithNew  = bps.Where(b => !string.IsNullOrWhiteSpace(b.U_FCNewCardCode)).ToList();
 
         report.AppendLine($"CLIENTS (BusinessPartners): {bps.Count} al cens complet");
 
         if (!udfsVisibles)
         {
-            report.AppendLine("   >>> Service Layer NO exposa encara U_FCCodiKais ni U_FCNewCardCode.");
-            report.AppendLine("       Els camps existeixen a SAP pero SL es cacheja les metadades:");
+            report.AppendLine("   >>> Service Layer NO exposa encara U_FCCodiKais.");
+            report.AppendLine("       El camp existeix a SAP pero SL es cacheja les metadades:");
             report.AppendLine("       cal reiniciar el servei Service Layer i tornar a executar la sonda.");
-            report.AppendLine($"   U_SEICodienllac informat : {withLink.Count} (camp descartat com a pont)");
+            ReportSuccessorLink(bps, kaisVisible: false, report);
             return;
         }
 
@@ -360,8 +358,6 @@ internal sealed class ProbeService
         // preexistents abans de l'1 de novembre. Si un es queda buit, el
         // COALESCE cau al CardCode de SAP i Analitza el veu com un client nou.
         report.AppendLine($"   U_FCCodiKais informat    : {Pct(bpWithKais.Count, bps.Count)}");
-        report.AppendLine($"   U_FCNewCardCode informat : {bpWithNew.Count} (buit es el normal: nomes s'omple als canvis de rao social)");
-        report.AppendLine($"   U_SEICodienllac informat : {withLink.Count} (camp descartat com a pont)");
 
         if (bpWithKais.Count == 0)
         {
@@ -394,6 +390,8 @@ internal sealed class ProbeService
 
             await CheckKaisCoverageAsync(bpWithKais, report, ct).ConfigureAwait(false);
         }
+
+        ReportSuccessorLink(bps, kaisVisible: true, report);
 
         var groups = await _sl.GetFirstPageAsync<ItemGroupRow>(
             ODataQueryBuilder.BuildItemGroups(), ct).ConfigureAwait(false);
@@ -428,6 +426,204 @@ internal sealed class ProbeService
         // Analitza recomana no passar de ~25 families i SAP en te 110.
         ReportTaxonomy(report, items, "U_SEIFamCialCat", i => i.U_SEIFamCialCat);
         ReportTaxonomy(report, items, "U_SEISubFamCialCat", i => i.U_SEISubFamCialCat);
+    }
+
+    /// <summary>
+    /// D'on surt el new_code: qui es el successor d'un client que ha canviat de
+    /// rao social. Analitza ho fa servir per no comptar el canvi com un client
+    /// perdut mes un de guanyat.
+    ///
+    /// El camp es U_SEICodienllac, de la implantacio. El 25/08/2026 la sonda el
+    /// va mirar buscant-hi el codi de KAIS, va veure 10 clients de 500 i el va
+    /// descartar per poca cobertura. La lectura era equivocada: no es un pont al
+    /// codi antic, es l'enllac al successor, i llavors 10 de 500 es la xifra que
+    /// toca perque son els clients que han canviat de rao social.
+    ///
+    /// Aquest bloc ha de contestar QUE hi ha guardat dins, perque sp_load_clients
+    /// hi ha de fer un JOIN i la clau no es evident: si el valor es un codi de
+    /// KAIS i el JOIN va contra CardCode, no lliga cap fila, new_code surt NULL
+    /// per a tothom i no salta cap validacio.
+    ///
+    /// La xifra d'autoreferencies es la que protegeix de tornar a llegir malament
+    /// el camp: un valor que apunta al propi client no es cap successor.
+    /// </summary>
+    private static void ReportSuccessorLink(List<PartnerRow> bps, bool kaisVisible, StringBuilder report)
+    {
+        static string? Net(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        var ambEnllac = bps.Where(b => Net(b.U_SEICodienllac) is not null).ToList();
+
+        report.AppendLine();
+        report.AppendLine("   --- U_SEICodienllac: l'enllac al client successor (new_code) ---");
+        report.AppendLine($"   informat : {Pct(ambEnllac.Count, bps.Count)}");
+        if (ambEnllac.Count == 0)
+        {
+            report.AppendLine("   >>> Cap client l'omple: new_code sortiria NULL per a tothom.");
+            return;
+        }
+
+        var perCardCode = new Dictionary<string, PartnerRow>(StringComparer.OrdinalIgnoreCase);
+        var perKais = new Dictionary<string, PartnerRow>(StringComparer.OrdinalIgnoreCase);
+        foreach (var b in bps)
+        {
+            if (Net(b.CardCode) is string cc) perCardCode[cc] = b;
+            if (kaisVisible && Net(b.U_FCCodiKais) is string kais) perKais[kais] = b;
+        }
+
+        // El camp es text lliure i el valor no ve tal com esta guardat a l'altra
+        // banda: la primera mesura (10/09/2026) va donar 0 de 160 resolts, i
+        // mirant-ho a ull hi havia C211431 -> '211433' amb el client C211433
+        // existint al mateix cens. O sigui que hi falta la 'C', i als codis de
+        // KAIS hi poden faltar els zeros de l'esquerra (8 digits).
+        //
+        // Les normalitzacions es proven aqui i es compten per separat en comptes
+        // de triar-ne una a ma: la que guanyi es la clau del JOIN de
+        // sp_load_clients, i encertar-la de memoria es com es fabrica un JOIN
+        // que no lliga i un new_code buit que no denuncia ningu.
+        static string Pad8(string s) => s.Length < 8 && s.All(char.IsDigit) ? s.PadLeft(8, '0') : s;
+
+        var estrategies = new (string Nom, Func<string, PartnerRow?> Resol)[]
+        {
+            ("CardCode exacte",          v => perCardCode.GetValueOrDefault(v)),
+            ("CardCode amb la C davant", v => perCardCode.GetValueOrDefault("C" + v)),
+            ("U_FCCodiKais exacte",      v => perKais.GetValueOrDefault(v)),
+            ("U_FCCodiKais amb zeros",   v => perKais.GetValueOrDefault(Pad8(v))),
+        };
+
+        var encerts = new int[estrategies.Length];
+        var autoRef = 0;
+        var mostra = new List<string>();
+        var noResolts = new List<string>();
+        var ambigus = new List<string>();
+
+        foreach (var b in ambEnllac)
+        {
+            var val = Net(b.U_SEICodienllac)!;
+            PartnerRow? desti = null;
+
+            for (var i = 0; i < estrategies.Length; i++)
+                if (estrategies[i].Resol(val) is PartnerRow d)
+                {
+                    encerts[i]++;
+                    desti ??= d;
+
+                    // Dues normalitzacions que porten a clients diferents: el
+                    // valor no identifica ningu sense dir quina val, i triar-ne
+                    // una a l'atzar assigna l'historic a qui no toca.
+                    if (!string.Equals(d.CardCode, desti.CardCode, StringComparison.OrdinalIgnoreCase))
+                        ambigus.Add($"      CardCode={b.CardCode}  ->  '{val}'  = {desti.CardCode} o {d.CardCode}");
+                }
+
+            if (desti is null)
+                noResolts.Add($"      CardCode={b.CardCode}  ->  '{val}'  (no existeix)  {b.CardName}");
+            else if (string.Equals(desti.CardCode, b.CardCode, StringComparison.OrdinalIgnoreCase))
+                autoRef++;
+
+            const int maxMostra = 20;
+            if (mostra.Count < maxMostra)
+                mostra.Add($"      CardCode={b.CardCode}  ->  '{val}'  " +
+                           (desti is null ? "(no resol)" : $"= {desti.CardCode} {desti.CardName}"));
+        }
+
+        for (var i = 0; i < estrategies.Length; i++)
+        {
+            var esKais = estrategies[i].Nom.StartsWith("U_FCCodiKais", StringComparison.Ordinal);
+            report.AppendLine($"   resolen per {estrategies[i].Nom,-24} : " +
+                              (esKais && !kaisVisible ? "n/d (SL no exposa el camp)" : encerts[i].ToString()));
+        }
+        report.AppendLine($"   no resolen enlloc                     : {noResolts.Count}");
+        report.AppendLine($"   apunten al propi client               : {autoRef}");
+
+        var millor = Array.IndexOf(encerts, encerts.Max());
+        if (encerts[millor] == 0)
+            report.AppendLine("   >>> Cap valor resol amb cap normalitzacio. Parar i mirar que hi ha guardat.");
+        else if (autoRef * 2 > encerts.Sum())
+            report.AppendLine("   >>> La majoria s'autoapunten: NO es l'enllac al successor, es el codi del propi client.");
+        else
+            report.AppendLine($"   >>> sp_load_clients ha de resoldre el successor per {estrategies[millor].Nom}.");
+
+        if (ambigus.Count > 0)
+        {
+            report.AppendLine($"   >>> {ambigus.Count} valors resolen a DOS clients diferents segons la normalitzacio:");
+            foreach (var x in ambigus.Take(10)) report.AppendLine(x);
+        }
+
+        ReportSuccessorDirection(ambEnllac, v => estrategies[millor].Resol(v), report);
+
+        foreach (var l in mostra) report.AppendLine(l);
+        if (mostra.Count < ambEnllac.Count)
+            report.AppendLine($"      ... i {ambEnllac.Count - mostra.Count} mes no llistats.");
+
+        // Cadascun d'aquests es un canvi de rao social que Analitza comptara com
+        // un client perdut i un de nou.
+        if (noResolts.Count > 0)
+        {
+            const int max = 25;
+            report.AppendLine($"   >>> {noResolts.Count} enllacos que no apunten a cap client de SAP:");
+            foreach (var x in noResolts.Take(max)) report.AppendLine(x);
+            if (noResolts.Count > max) report.AppendLine($"      ... i {noResolts.Count - max} mes no llistats.");
+        }
+    }
+
+    /// <summary>
+    /// En quina direccio apunta l'enllac. new_code ha de ser el codi NOU: si el
+    /// camp guarda el client d'on ve i no cap on va, emetre'l tal qual lliga
+    /// l'historic al reves i Analitza acumula les vendes al registre mort.
+    ///
+    /// El nom del camp ("codi enllac") no ho diu i la cobertura tampoc. El que
+    /// ho diu es quin dels dos extrems esta de baixa: d'un canvi de rao social
+    /// en queda un registre viu i un de mort, i el viu es sempre el nou.
+    /// </summary>
+    private static void ReportSuccessorDirection(
+        List<PartnerRow> ambEnllac, Func<string, PartnerRow?> resol, StringBuilder report)
+    {
+        static bool Actiu(PartnerRow p) => p.Valid == "tYES";
+
+        int viuAMort = 0, mortAViu = 0, viuAViu = 0, mortAMort = 0;
+        foreach (var b in ambEnllac)
+        {
+            var desti = resol(b.U_SEICodienllac!.Trim());
+            if (desti is null) continue;
+            if (Actiu(b) && !Actiu(desti)) viuAMort++;
+            else if (!Actiu(b) && Actiu(desti)) mortAViu++;
+            else if (Actiu(b)) viuAViu++;
+            else mortAMort++;
+        }
+
+        report.AppendLine($"   direccio: viu -> de baixa : {viuAMort}   (el camp guarda el PREDECESSOR)");
+        report.AppendLine($"   direccio: de baixa -> viu : {mortAViu}   (el camp guarda el SUCCESSOR)");
+        report.AppendLine($"   tots dos vius : {viuAViu}   tots dos de baixa : {mortAMort}");
+
+        if (viuAMort > mortAViu)
+            report.AppendLine("   >>> Apunta ENRERE. new_code demana el codi nou: emetre'l tal qual el posaria del reves.");
+        else if (mortAViu > viuAMort)
+            report.AppendLine("   >>> Apunta ENDAVANT: es el successor i va directe a new_code.");
+        else
+            report.AppendLine("   >>> Direccio no concloent. No es pot cablejar cap dels dos sentits sense mirar-ho a ma.");
+
+        // Si apunta enrere, sp_load_clients ha d'INVERTIR la relacio: el new_code
+        // d'un client es el codi de qui l'apunta a ell. Invertir una relacio que
+        // no es 1:1 multiplica files, i a est_clients una fila de mes vol dir un
+        // id_client_location duplicat.
+        var successorsPer = ambEnllac
+            .Select(b => (Successor: b, Predecessor: resol(b.U_SEICodienllac!.Trim())))
+            .Where(x => x.Predecessor is not null)
+            .GroupBy(x => x.Predecessor!.CardCode ?? "", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var multiples = successorsPer.Where(g => g.Count() > 1).ToList();
+        var codisAmbEnllac = new HashSet<string>(ambEnllac.Select(b => b.CardCode ?? ""), StringComparer.OrdinalIgnoreCase);
+        var cadenes = successorsPer.Count(g => codisAmbEnllac.Contains(g.Key));
+
+        report.AppendLine($"   predecessors diferents apuntats : {successorsPer.Count}");
+        report.AppendLine($"   amb MES D'UN successor          : {multiples.Count}");
+        report.AppendLine($"   cadenes (el predecessor en te un altre al darrere) : {cadenes}");
+
+        foreach (var g in multiples.Take(10))
+            report.AppendLine($"      {g.Key} <- {string.Join(", ", g.Select(x => x.Successor.CardCode))}");
+
+        if (multiples.Count > 0)
+            report.AppendLine("   >>> La inversio NO es 1:1: cal triar-ne un de sol o est_clients duplica files.");
     }
 
     /// <summary>

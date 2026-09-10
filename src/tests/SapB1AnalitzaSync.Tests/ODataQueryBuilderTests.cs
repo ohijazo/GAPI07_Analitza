@@ -83,6 +83,20 @@ public class ODataQueryBuilderTests
 
         Assert.Contains("U_SEISubFamCialCat", Uri.UnescapeDataString(ODataQueryBuilder.BuildItems()));
 
+        // Continuitat amb KAIS (Regla 04): sense aquests dos, id_client_location
+        // cau al CardCode de SAP i el new_code queda buit.
+        Assert.Contains("U_FCCodiKais", partners);
+        Assert.Contains("U_SEICodienllac", partners);
+
+        // U_FCNewCardCode es va crear el 26/08/2026 duplicant U_SEICodienllac i
+        // s'ha borrat de SAP. Tornar a demanar-lo no dona un camp buit: SL manté
+        // les metadades cacheades i la consulta acaba arribant a SQL amb una
+        // columna que ja no existeix. El fallback del client nomes salta amb un
+        // HTTP 400, i aquest error no ve de les metadades sino de sota (lliçó L7
+        // de preparacioComandesVendaSAP), o sigui que la baixada de clients peta.
+        foreach (var url in AllQueries())
+            Assert.DoesNotContain("U_FCNewCardCode", Uri.UnescapeDataString(url));
+
         // U_SEIZONAC viu a BPAddress i no es demana camp a camp: arriba sencera
         // dins de BPAddresses, perque SL v1 no accepta $select imbricat.
         Assert.Contains("BPAddresses", partners);

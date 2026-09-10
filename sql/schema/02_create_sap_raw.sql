@@ -67,8 +67,12 @@ GO
 IF COL_LENGTH('sap_raw.OCRD', 'U_FCCodiKais') IS NULL
     ALTER TABLE sap_raw.OCRD ADD U_FCCodiKais nvarchar(50) NULL;   -- codi del client a KAIS
 GO
-IF COL_LENGTH('sap_raw.OCRD', 'U_FCNewCardCode') IS NULL
-    ALTER TABLE sap_raw.OCRD ADD U_FCNewCardCode nvarchar(50) NULL; -- CardCode del successor
+/* El successor per canvi de rao social NO surt d'un camp del projecte: surt de
+   U_SEICodienllac, que ja portava la implantacio i que feia exactament aixo. El
+   U_FCNewCardCode que es va crear el 26/08/2026 el duplicava; s'ha borrat de SAP
+   i la columna se'n va a 04_migracions.sql. */
+IF COL_LENGTH('sap_raw.OCRD', 'U_SEICodienllac') IS NULL
+    ALTER TABLE sap_raw.OCRD ADD U_SEICodienllac nvarchar(50) NULL; -- enllac al client successor
 GO
 
 /* CRD1 — adreces del BP.  SL: BusinessPartners?$expand=BPAddresses

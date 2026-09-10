@@ -40,7 +40,7 @@ internal static class MirrorTables
         dt.Columns.Add("U_SEISEGH2", typeof(string));
         dt.Columns.Add("UpdateDate", typeof(DateTime));
         dt.Columns.Add("U_FCCodiKais", typeof(string));
-        dt.Columns.Add("U_FCNewCardCode", typeof(string));
+        dt.Columns.Add("U_SEICodienllac", typeof(string));
         return dt;
     }
 
@@ -63,7 +63,7 @@ internal static class MirrorTables
         Val(r.U_SEISEGH2),
         Val(r.UpdateDate),
         Val(r.U_FCCodiKais),
-        Val(r.U_FCNewCardCode));
+        Val(r.U_SEICodienllac));
 
     public static DataTable NewCrd1()
     {

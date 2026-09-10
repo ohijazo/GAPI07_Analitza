@@ -51,7 +51,19 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    `OITB.U_FCCodiKais` (famílies) **no cal poblar-lo**: l'Adrià accepta que els ids de família
    canviïn. Es queda creat i buit.
 
-4. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes els
+4. **Esborrar `OCRD.U_FCNewCardCode` de SAP i reiniciar el Service Layer.** El camp duplicava
+   `U_SEICodienllac`, de la implantació, que ja portava l'enllaç entre un client i el que substitueix
+   (veure `docs/memoria_projecte.md` §6.4b). Mai s'ha omplert, així que esborrar-lo no perd res.
+
+   **L'ordre no és intercanviable:** primer el codi desplegat (ja fet el 10/09/2026 a test — el
+   `$select` de `BusinessPartners` ja no el nomena), després l'esborrat a SAP, i tot seguit el
+   reinici dels quatre serveis `b1s5000x` i el controlador amb PowerShell elevada. Si s'esborra amb
+   el codi antic desplegat, la baixada diària de clients peta sencera: SL manté les metadades
+   cacheades i la consulta arriba a SQL amb una columna que ja no existeix.
+
+   A productiva això encara no s'ha fet.
+
+5. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes els
    hagi habilitat la VPN. Ja està rotada (31/08/2026) i apuntada al gestor. L'endpoint i les
    credencials de VPN els dona Sistemes, no nosaltres.
 

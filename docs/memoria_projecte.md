@@ -421,7 +421,7 @@ els de SAP; si no coincideixen, l'històric deixa de lligar. Mesurat amb la sond
 | **Comercials** | ❌ **No** | 48 de 49 tenen `SalesPerson.U_FCCodiKais` informat, i **només 2 de 48** coincideixen amb el `id_salesman` que emet l'ETL. Ex.: SlpCode 2 → `'002'`, però a KAIS era `'006'` |
 | **Famílies** | ❌ **No** | `ItmsGrpCod` és una seqüència interna de SAP (108, 109, 110...). Però **110 de 110** noms de grup tenen format `<codi>-<descripció>`: `109 = "010001-BLAT SUPER FORÇA"` |
 | **Productes** | ✔️ **Sí** | Confirmat per l'Oscar (25/08/2026): a la migració es van preservar. Els `ItemCode` tenen format llegat (`00010`, `00020`, `00340`) |
-| **Clients** | ❌ **No, i sense pont** | `BusinessPartner.U_SEICodienllac` només està informat en **10 de 500**, i la numeració no lliga amb el `CardCode` (`C201128` ↔ `201011`) |
+| **Clients** | ❌ **No, i sense pont** | `BusinessPartner.U_SEICodienllac` només està informat en **10 de 500**, i la numeració no lliga amb el `CardCode` (`C201128` ↔ `201011`). **Correcció del 10/09/2026: aquesta lectura era equivocada** — el camp no és cap pont al codi de KAIS, és l'enllaç al client predecessor, i per això només l'omplen els qui n'han substituït un altre. Veure §6.4b |
 | **Línies d'albarà** | — | Derivats de document + línia. L'Adrià ja va dir que no li preocupen |
 
 **Conseqüències:**
@@ -503,6 +503,49 @@ Els 13: `00241441` FORN DE PA L'ESTANYOL · `00251299` PAN DE 2AM · `00271547` 
 **Avís sobre aquesta xifra:** està mesurada contra `DB_FARINERA_TEST`. Part dels 13 poden existir a
 la productiva i ser només un desfasament de la còpia de test. S'ha de tornar a mesurar contra
 `DB_FARINERA_PROD` abans de donar cap d'aquests casos per bo.
+
+### 6.4b `U_SEICodienllac` no era el que ens pensàvem (10/09/2026)
+
+El 25/08 la sonda va mirar `OCRD.U_SEICodienllac` buscant-hi el codi de KAIS, va veure 10 clients de
+500 informats i una numeració que no lligava, i el va **descartar com a pont**. Aquella conclusió va
+quedar escrita a la taula de §6.4, a `comunicacio_udfs_sap.md` i a la mateixa sonda, que fins ara
+l'etiquetava «camp descartat com a pont». Sobre aquesta base es va crear `OCRD.U_FCNewCardCode` per
+guardar el client successor en un canvi de raó social.
+
+**El camp ja feia exactament això.** `U_FCNewCardCode` el duplicava i s'ha retirat.
+
+La mesura, ampliant `--probe` sobre el cens sencer de `DB_FARINERA_TEST`:
+
+| | |
+|---|---|
+| Clients amb `U_SEICodienllac` informat | 160 de 4.691 (3,4%) |
+| Resolen amb el valor tal qual | **0** |
+| Resolen contra `U_FCCodiKais` omplint zeros fins a 8 | **160** |
+| Resolen contra `CardCode` posant-hi la `C` al davant | 159 |
+| Apunten al propi client | 0 |
+| De client viu a client de baixa | **108** |
+| De client de baixa a client viu | 2 |
+| Predecessors amb més d'un successor | 1 (`C211608` ← `C211534`, `C301563`) |
+| Cadenes (A substitueix B, que substituïa C) | 20 |
+
+Dues coses que canvien la implementació:
+
+1. **El valor no ve tal com està a l'altra banda.** Hi falten els zeros de l'esquerra i la `C`. Amb
+   una comparació directa el JOIN no lliga cap fila, `new_code` surt NULL per a tothom i cap
+   validació ho detecta. És el mode de fallada de sempre (§8).
+2. **El camp apunta ENRERE.** Guarda el predecessor, no el successor, i `new_code` demana el codi
+   nou. Emetre'l tal qual lligaria l'històric al revés i Analitza acumularia les vendes al registre
+   mort. Per això `etl.vw_client_successor` **inverteix** la relació, i com que la inversió no és
+   1:1 tria un sol successor amb `TOP 1` (el viu; entre dos de vius, el `CardCode` més alt) i avisa
+   amb el check `new_code_ambiguous`.
+
+La lliçó no és sobre aquest camp: és que **es va mesurar la cobertura d'un camp sense saber què hi
+havia d'haver dins**. Un 3% és una xifra dolenta si el camp ha de portar el codi antic de tothom, i
+és exactament la xifra correcta si el que porta és qui substitueix qui. La cobertura sola no
+respon res.
+
+Resultat: `new_code` passa de 0 a 168 files a `staging.est_clients`, i `id_client_location` no es
+mou (les mateixes 5.647 diferències contra `baseline` que abans del canvi).
 
 ### 6.5 El número d'adreça tampoc era el de KAIS (28\08\2026)
 

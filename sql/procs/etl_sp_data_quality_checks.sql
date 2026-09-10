@@ -399,6 +399,80 @@ BEGIN
             VALUES (@rid, 'ship_address_changed', 'WARN', @addr_detail);
         END
 
+        /* ----- 13) Enllaç de successor que no apunta a ningu (WARN) -----
+
+           U_SEICodienllac guarda el codi del client que aquest ve a substituir,
+           i etl.vw_client_successor inverteix la relacio per emetre el new_code.
+           Un valor que no resol a cap client no dona un error: dona un new_code
+           NULL, i llavors Analitza compta el canvi de rao social com un client
+           perdut mes un de guanyat, que es precisament el que el camp evita.
+
+           A test resolen 160 de 160. Qualsevol xifra diferent de zero vol dir
+           que algu ha escrit a ma un codi que no existeix, o que la
+           normalitzacio del capçal de la vista s'ha quedat curta. -----*/
+        SELECT @cnt = COUNT(*)
+        FROM   sap_raw.OCRD AS s
+        WHERE  NULLIF(LTRIM(RTRIM(s.U_SEICodienllac)), '') IS NOT NULL
+          AND  NOT EXISTS (SELECT 1
+                           FROM   sap_raw.OCRD AS p
+                           INNER JOIN etl.vw_client_code AS pcc ON pcc.CardCode = p.CardCode
+                           WHERE  p.CardCode <> s.CardCode
+                             AND  (CASE WHEN LEN(LTRIM(RTRIM(s.U_SEICodienllac))) <= 8
+                                        THEN RIGHT('00000000' + LTRIM(RTRIM(s.U_SEICodienllac)), 8)
+                                        ELSE LTRIM(RTRIM(s.U_SEICodienllac)) END = pcc.client_code
+                                   OR 'C' + LTRIM(RTRIM(s.U_SEICodienllac)) = RTRIM(p.CardCode)));
+        IF @cnt > 0
+        BEGIN
+            DECLARE @succ_detail nvarchar(max) =
+                'Clients amb U_SEICodienllac que no apunta a cap client de SAP: ' + CAST(@cnt AS varchar(20))
+                + '. Cadascun deixa el seu predecessor sense new_code i Analitza el comptara com un client nou. ';
+            SELECT TOP 10 @succ_detail = @succ_detail
+                   + RTRIM(s.CardCode) + ' -> ''' + LTRIM(RTRIM(s.U_SEICodienllac)) + ''' '
+            FROM   sap_raw.OCRD AS s
+            WHERE  NULLIF(LTRIM(RTRIM(s.U_SEICodienllac)), '') IS NOT NULL
+              AND  NOT EXISTS (SELECT 1
+                               FROM   sap_raw.OCRD AS p
+                               INNER JOIN etl.vw_client_code AS pcc ON pcc.CardCode = p.CardCode
+                               WHERE  p.CardCode <> s.CardCode
+                                 AND  (CASE WHEN LEN(LTRIM(RTRIM(s.U_SEICodienllac))) <= 8
+                                            THEN RIGHT('00000000' + LTRIM(RTRIM(s.U_SEICodienllac)), 8)
+                                            ELSE LTRIM(RTRIM(s.U_SEICodienllac)) END = pcc.client_code
+                                       OR 'C' + LTRIM(RTRIM(s.U_SEICodienllac)) = RTRIM(p.CardCode)))
+            ORDER BY s.CardCode;
+
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'new_code_unresolved', 'WARN', @succ_detail);
+        END
+
+        /* ----- 14) Un predecessor amb mes d'un successor (WARN) -----
+
+           etl.vw_client_successor en tria un de sol amb TOP 1, perque si no
+           multiplicaria files a staging.est_clients i hi hauria
+           id_client_location duplicats. Pero el que descarta no es soroll: son
+           dos clients que diuen substituir el mateix. Qui ho miri ha de decidir
+           quin val; mentrestant s'emet el viu, i entre dos de vius el CardCode
+           mes alt. A test n'hi ha 1 (C211608 <- C211534, C301563). -----*/
+        SELECT @cnt = COUNT(*) FROM (
+            SELECT pcc.client_code
+            FROM   sap_raw.OCRD AS s
+            INNER JOIN sap_raw.OCRD AS p ON p.CardCode <> s.CardCode
+            INNER JOIN etl.vw_client_code AS pcc ON pcc.CardCode = p.CardCode
+            WHERE  NULLIF(LTRIM(RTRIM(s.U_SEICodienllac)), '') IS NOT NULL
+              AND  (CASE WHEN LEN(LTRIM(RTRIM(s.U_SEICodienllac))) <= 8
+                         THEN RIGHT('00000000' + LTRIM(RTRIM(s.U_SEICodienllac)), 8)
+                         ELSE LTRIM(RTRIM(s.U_SEICodienllac)) END = pcc.client_code
+                    OR 'C' + LTRIM(RTRIM(s.U_SEICodienllac)) = RTRIM(p.CardCode))
+            GROUP BY pcc.client_code
+            HAVING COUNT(DISTINCT s.CardCode) > 1
+        ) AS dups;
+        IF @cnt > 0
+        BEGIN
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'new_code_ambiguous', 'WARN',
+                    'Clients apuntats com a predecessor per mes d un successor: ' + CAST(@cnt AS varchar(20))
+                    + '. La vista n emet un de sol; la resta no arriben a Analitza.');
+        END
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),

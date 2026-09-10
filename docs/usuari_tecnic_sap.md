@@ -47,7 +47,7 @@ A la finestra d'autoritzacions, tot el que sigui **Sense autorització** excepte
 **Només lectura**. Cap permís d'escriptura enlloc: el Worker no escriu mai a SAP, i si algun dia
 algú ho intentés, val més que peti.
 
-També ha de poder llegir els UDFs `U_FCCodiKais`, `U_FCNewCardCode`, `U_SEIPOSBC`, `U_SEISEGH1`,
+També ha de poder llegir els UDFs `U_FCCodiKais`, `U_SEICodienllac`, `U_SEIPOSBC`, `U_SEISEGH1`,
 `U_SEISEGH2`, `U_SEIZONAC` i `U_SEISubFamCialCat`. Normalment van amb l'autorització de la taula,
 però si la instal·lació té autoritzacions per camp, cal repassar-ho.
 

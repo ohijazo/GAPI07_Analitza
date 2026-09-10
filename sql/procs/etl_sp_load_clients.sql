@@ -13,8 +13,10 @@
      - active = 1 si validFor='Y' AND (frozenFor IS NULL OR frozenFor='N'), else 0
      - salesmen_id = etl.vw_salesman_code (NO el SlpCode: els codis de comercial
        tampoc es van preservar a la migració)
-     - new_code = el codi EMÈS del successor (U_FCNewCardCode passat per la
-       mateixa vista), o NULL. Analitza hi concatena '-000' pel seu compte.
+     - new_code = el codi EMÈS del client que substitueix aquest, o NULL.
+       Surt de etl.vw_client_successor, que INVERTEIX U_SEICodienllac: aquell
+       camp guarda el predecessor, no el successor (veure el capçal de la
+       vista). Analitza hi concatena '-000' pel seu compte.
      - country_code minúscules; overrides via cfg.country_code_overrides
      - payment_method/holidays/comments NO van a est_clients (KAIS format)
 
@@ -59,7 +61,7 @@ BEGIN
             LOWER( LEFT( COALESCE( ov.iso2_code, NULLIF(c.Country, ''), 'es' ), 4 ))
                                                                                     AS country_code,
             LEFT(ISNULL(sc.id_salesman, '000'), 3)                                  AS salesmen_id,
-            LEFT(succ.client_code, 8)                                               AS new_code,
+            succ.new_code                                                           AS new_code,
             LEFT(ISNULL(c.Phone1, ''), 30)                                          AS phone_number,
             LEFT(ISNULL(c.E_Mail, ''), 60)                                          AS email
         FROM   sap_raw.OCRD AS c
@@ -69,8 +71,8 @@ BEGIN
                ON ov.sap_country_code = c.Country
         LEFT JOIN etl.vw_salesman_code AS sc
                ON sc.SlpCode = c.SlpCode
-        LEFT JOIN etl.vw_client_code AS succ
-               ON succ.CardCode = NULLIF(LTRIM(RTRIM(c.U_FCNewCardCode)), '')
+        LEFT JOIN etl.vw_client_successor AS succ
+               ON succ.CardCode = c.CardCode
         WHERE  c.CardType = 'C'
           AND  NOT EXISTS (
                 SELECT 1 FROM sap_raw.CRD1 a
@@ -95,7 +97,7 @@ BEGIN
             LOWER( LEFT( COALESCE( ov.iso2_code, NULLIF(a.Country, ''), NULLIF(c.Country, ''), 'es' ), 4 ))
                                                                                     AS country_code,
             LEFT(ISNULL(sc.id_salesman, '000'), 3)                                  AS salesmen_id,
-            LEFT(succ.client_code, 8)                                               AS new_code,
+            succ.new_code                                                           AS new_code,
             LEFT(ISNULL(c.Phone1, ''), 30)                                          AS phone_number,
             LEFT(ISNULL(c.E_Mail, ''), 60)                                          AS email
         FROM   sap_raw.OCRD AS c
@@ -110,8 +112,8 @@ BEGIN
                ON ov.sap_country_code = a.Country
         LEFT JOIN etl.vw_salesman_code AS sc
                ON sc.SlpCode = c.SlpCode
-        LEFT JOIN etl.vw_client_code AS succ
-               ON succ.CardCode = NULLIF(LTRIM(RTRIM(c.U_FCNewCardCode)), '')
+        LEFT JOIN etl.vw_client_successor AS succ
+               ON succ.CardCode = c.CardCode
         WHERE  c.CardType = 'C';
 
         SET @rows_out = @@ROWCOUNT;
