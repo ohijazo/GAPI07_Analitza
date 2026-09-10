@@ -29,6 +29,16 @@ dotnet build P:\GAPI07_Analitza\src\SapB1AnalitzaSync.sln -c Release   # 0 warni
 dotnet test  P:\GAPI07_Analitza\src\tests\SapB1AnalitzaSync.Tests
 ```
 
+```powershell
+# Correus i documents: markdown -> Word. El --from/--to retalla la capcalera i
+# la nota interna, que no han de sortir mai al fitxer que s'envia.
+python tools\md2docx.py resposta_sistemes_2026-09-10.md resposta_sistemes_2026-09-10.docx `
+    --from "Hola," --to "ohijazo@agrienergia.com"
+
+# Abans d'enviar res: quins .docx s'han quedat enrere del seu .md
+python tools\md2docx.py --check
+```
+
 ```sql
 -- Executar l'ETL a mà (mode inspecció: deixa dades a staging, no fa swap)
 EXEC IntercanviSAP.etl.sp_run_all @SkipSwap=1, @ForceFullLines=1;

@@ -50,3 +50,7 @@ publish/
 # l'historic de git. A mes son una fotografia amb data: se n'ha de demanar una
 # de nova just abans del tall.
 docs/client_locations*.csv
+
+# Bytecode de Python (tools/)
+__pycache__/
+*.pyc

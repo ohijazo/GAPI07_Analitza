@@ -700,6 +700,28 @@ Recollits a `.claude/rules/02-service-layer-odata.md`. Cadascun ve d'un bug real
 | El README declarava 10.342 client_locations i 3.253 atributs | `README.md` | ✅ Són 5.651 i 5.651 |
 | `deploy_via_powershell.ps1` no incloïa `02_create_sap_raw.sql` ni `seed_zone_code_mapping.sql` | ídem | ✅ |
 | Precedència d'`EXCEPT`/`UNION ALL` mal parentitzada a la comparació de Fase 4 | `verify_migration.sql` | ✅ Detectat abans d'executar-lo; `A EXCEPT B UNION ALL C EXCEPT D` no vol dir el que sembla |
+| El `.docx` enviat a Sistemes el 07/09/2026 no deia el mateix que el seu `.md` | `correu_sistemes_2026-09-07.docx` | ⚠️ **El fitxer enviat es queda com està: és el que van rebre.** Veure sota |
+
+**Un Word que no diu el mateix que el seu markdown (10/09/2026).** El correu a Sistemes es va
+convertir a `.docx` a mig editar el markdown i no es va tornar a generar. Tots dos fitxers van
+entrar al mateix commit, i el que va sortir per correu **no portava l'última secció ni el comiat**,
+i li faltava mitja frase al segon paràgraf. Sistemes van contestar el 10/09 els quatre punts que
+els van arribar; la pregunta que faltava —qui ha de refrescar `DB_FARINERA_TEST`— es va donar per
+ignorada quan mai no la van rebre.
+
+No va ser un bug de `tools/md2docx.py`: amb el markdown final el conversor treu el text sencer. El
+forat era que **ningú comparava el Word amb el seu origen**, i un document incomplet s'obre bé i fa
+patxoca. Dues coses al conversor:
+
+- Grava i **torna a llegir** el `.docx` per verificar bloc a bloc que hi ha tot el que hi havia al
+  markdown. Si no quadra, surt amb error.
+- Cada `.docx` porta gravat un **segell** del tros de markdown d'on va sortir, i
+  `python tools/md2docx.py --check` diu quins s'han quedat enrere. Aquesta és la que hauria
+  detectat el cas del 07/09, perquè allà el problema no era la conversió sinó que no es va tornar a
+  convertir.
+
+El `.docx` del 07/09 **no s'ha regenerat a propòsit**: és el registre del que Sistemes van rebre, i
+la seva resposta només s'entén contra aquell text.
 
 ### Paranys que continuen al codi
 
