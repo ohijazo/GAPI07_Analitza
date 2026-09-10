@@ -945,10 +945,17 @@ d'infraestructura, no de SAP.
 > de firewall, però és la del Worker, no la d'Analitza. No barrejar-les.
 
 **Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al
-contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). Queda **passar-li la
-contrasenya per un canal a part** —al correu se li va dir que li arribaria quan tingués accés— i
-**fer-li arribar l'endpoint i les credencials de VPN**, que ha de donar Sistemes. Totes dues coses
-depenen que Sistemes els habiliti l'accés (Bloc A).
+contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). ✅ **Sistemes van habilitar
+l'accés el 10/09/2026**: Analitza ja entra per VPN a `AE01SAPSQL:1433`, i no calia enviar-los cap
+endpoint perquè les credencials de VPN són les que ja tenien.
+
+Queda una sola cosa: **passar-li la contrasenya per un canal a part**.
+
+> ⚠️ Sistemes ho van comunicar com «les credencials i l'url són les mateixes, no ha canviat res».
+> Per la VPN és cert; **pel login de SQL no**. La contrasenya d'`analitza_ro` es va rotar el
+> 31/08/2026 i el mateix dia el compte va sortir de `db_datareader`. Si l'Adrià prova amb la que
+> tenia guardada, el símptoma és un login fallit que sembla un problema de xarxa, i el diagnòstic
+> se'n va cap a Sistemes durant dies. Avisar-los tots dos alhora.
 
 **Bloc C — Pendent amb l'Adrià.** Revisat contra els seus correus del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`), tres dels pendents ja tenen resposta o camí:

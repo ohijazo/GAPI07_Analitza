@@ -19,10 +19,10 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 | Depèn de | Què falta |
 |---|---|
 | **Adrià (Analitza)** | Les respostes del correu enviat el **31/08/2026** (`resposta_adria_2.docx`). Sense la del `/100`, el pas 2.4 no es pot escriure |
-| **Sistemes** | Worker desplegat a `AE01SAPRDP` i accés d'Analitza a `AE01SAPSQL` habilitat **per VPN** (no és obrir 1433 a internet — veure `memoria_projecte.md` §9, Bloc A) |
+| **Sistemes** | Worker desplegat a `AE01SAPRDP`: compte de servei, *Log on as a batch job* i la tasca de les 02:45. ~~Accés d'Analitza~~ ✅ **concedit el 10/09/2026** — ja tenen VPN i `AE01SAPSQL:1433`, i les credencials de VPN són les de sempre |
 | **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |
 | ~~Consultors de SAP~~ | ✅ **Resolt l'01/09/2026**: el blueprint signat (cap. 17.3) diu que **no es migra l'històric documental**. Veure sota |
-| **Nosaltres** | Res. La contrasenya d'`analitza_ro` es va rotar el 31/08/2026; passar-la-hi depèn que Sistemes els habiliti la VPN |
+| **Nosaltres** | **Passar la contrasenya d'`analitza_ro` a l'Adrià.** Ja no depèn de ningú: Sistemes els van habilitar l'accés el 10/09/2026. Compte, que ells creuen que "no ha canviat res" — la contrasenya sí que va canviar el 31/08 i els permisos es van acotar el mateix dia |
 
 ---
 
