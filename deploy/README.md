@@ -57,6 +57,18 @@ Copy-Item "\\tomatera\Farinera\ohijazo\GAPI07_Analitza\publish\*" C:\Apps\SapB1A
 Els 81 MB s'estiren **des de dins de la màquina**: `\\tomatera` és accessible des d'allà i així no
 cal compartir la carpeta destí.
 
+⚠️ **Mira la data del `.exe` abans de copiar-lo.** La carpeta `publish` és una fotografia manual i no
+es regenera sola: el 16/09/2026 encara hi havia el binari del 26/08, anterior a la família comercial
+i a la inversió del `U_SEICodienllac`. Desplegar-lo no hauria petat — hauria omplert `sap_raw` amb
+dades incorrectes, que és pitjor. Compara-la amb l'últim commit que toca `src\`:
+
+```powershell
+(Get-Item P:\GAPI07_Analitza\publish\SapB1AnalitzaSync.Worker.exe).LastWriteTime
+git -C P:\GAPI07_Analitza log -1 --format=%ci -- src
+```
+
+Si el commit és més nou, torna a publicar abans de copiar res.
+
 La publicació és **autocontinguda**: no cal instal·lar el runtime de .NET 8 al servidor.
 
 Per regenerar-la, des de l'equip de desenvolupament:
@@ -113,6 +125,19 @@ Crea `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json`:
 
 `AllowInvalidCertificates` a `true` perquè el certificat del Service Layer és autofirmat. Si algun
 dia se'n posa un de vàlid, cal treure-ho.
+
+⚠️ **Si en aquella màquina hi has de llançar `--probe`, afegeix-hi també el bloc `Sync`.** El valor
+que hereta de l'`appsettings.json` base és `P:\GAPI07_Analitza\docs\client_locations.csv`, i `P:` és
+una unitat mapada de l'equip de l'Oscar: a `AE01SAPRDP` no existeix. La sonda **no peta** quan no
+troba el fitxer, escriu `Encaix amb el cens de KAIS: OMES` i continua — o sigui que la comprovació
+més important d'abans del tall (*cap client sense `U_FCCodiKais`*) sortiria verda sense haver
+comprovat res. Copia el CSV a la màquina i apunta-l'hi:
+
+```json
+  "Sync": { "KaisClientExportPath": "C:\\Apps\\SapB1AnalitzaSync\\client_locations.csv" }
+```
+
+Per al cicle nocturn (`--once`) és indiferent: aquest camí només el fa servir la sonda.
 
 La carpeta ha de quedar llegible **només pel compte de la tasca i pels administradors**. Sistemes la
 van crear el 16/09/2026 ja amb aquesta ACL —`sapsistemes`, administradors locals i administrador de
