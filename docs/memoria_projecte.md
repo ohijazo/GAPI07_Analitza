@@ -3,7 +3,7 @@
 > Visió executiva completa: què és, com funciona, què s'ha decidit i per què, què s'ha
 > trobat pel camí i què queda obert.
 >
-> Última actualització: **31/08/2026**
+> Última actualització: **16/09/2026**
 
 ---
 
@@ -231,11 +231,9 @@ notava perquè no havia canviat res.
 **Bloquejat**: no tenim accés a `AE01SAPRDP`. Fins llavors el job de les 03:00 avortarà amb
 `ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
 
-⚠️ **A Sistemes no se'ls ha demanat encara.** L'última comunicació és el correu del **15/06/2026**,
-que ells van contestar punt per punt. La petició de l'01/09 (`peticio_sistemes_worker.docx`) **no es
-va enviar mai**, i des del juny tenen una pregunta nostra sense resposta —la del punt 6, amb quin
-compte es fa el Database Mail—, o sigui que la pilota estava aquí, no allà. El correu que s'envia és
-`correu_sistemes_2026-09-07.md`, continuació d'aquell fil.
+**Demanat a Sistemes el 07/09/2026** i el fil segueix viu; l'estat, a §9, *El fil amb Sistemes*. A
+16/09/2026 encara no hi ha ni compte de servei, ni carpeta, ni tasca: `C:\Apps\SapB1AnalitzaSync`
+**no existeix** a `AE01SAPRDP`.
 
 **Quatre comptes diferents, i els crea gent diferent:**
 
@@ -924,8 +922,9 @@ El que sí que val del blueprint és el capítol 17, de dalt.
 
 ### Del projecte, anteriors a la migració
 
-**Bloc A — Sistemes:** compte SMTP per a Database Mail; accés d'Analitza a `AE01SAPSQL`. Són feina
-d'infraestructura, no de SAP.
+**Bloc A — Sistemes:** desplegament del Worker a `AE01SAPRDP` (compte de servei, carpeta i tasca de
+les 02:45); freqüència i retenció del backup d'`AE01SAPSQL`; compte SMTP per a Database Mail.
+~~Accés d'Analitza a `AE01SAPSQL`~~ ✅ concedit el 10/09/2026. Són feina d'infraestructura, no de SAP.
 
 > ⚠️ **No és obrir el port 1433 a les IP públiques d'Analitza.** Ho vam entendre malament durant
 > mesos. La resposta de Sistemes del **15/06/2026** ho diu: *«Perquè Analitza pugui accedir el
@@ -943,6 +942,52 @@ d'infraestructura, no de SAP.
 >
 > La petició de `192.168.11.239` cap a `192.168.11.238` (ports 50000 i 1433) **sí** que és una regla
 > de firewall, però és la del Worker, no la d'Analitza. No barrejar-les.
+
+#### El fil amb Sistemes (07/09 → 16/09/2026)
+
+| Data | Qui | Què |
+|---|---|---|
+| 15/06/2026 | Sistemes | Contesten set punts. Concedeixen l'accés d'Analitza («només m'ho heu de dir»). En queden dos pendents **d'informació nostra** |
+| 07/09/2026 | Nosaltres | `correu_sistemes_2026-09-07.md`: es reprèn el fil i s'afegeix el punt 8 (`AE01SAPRDP`). **El `.docx` va sortir tallat** |
+| 10/09/2026 | Sistemes | Habiliten l'accés d'Analitza. Del 3 repeteixen el del juny; del 6 diuen que ho parlen amb en Cáliz; del 8 entenen només l'accés per a `ohijazo` |
+| 10/09/2026 | Nosaltres | `resposta_sistemes_2026-09-10.md`: es concreta el 3, el 6 i el 8, i es torna a fer la pregunta del refresc de `DB_FARINERA_TEST`, que mai no els va arribar |
+| 16/09/2026 | Sistemes | Del punt 8: *«aquesta carpeta `C:\Apps\SapB1AnalitzaSync` és a `AE01SAPRDP` o `AE01SAPSQL`? la tinc de crear o ja està creada?»* |
+| 16/09/2026 | Nosaltres | `resposta_sistemes_2026-09-16.md`: `AE01SAPRDP`, i s'ha de crear |
+
+**La resposta, per no tornar-la a buscar:** la carpeta va a **`AE01SAPRDP`** (192.168.11.239) i **no
+existeix**. A `AE01SAPSQL` no hi va res de nou —ja hi corre el job de les 03:00 i a partir del
+cutover és la màquina més crítica que tenim— i la carpeta buida la creen ells, perquè va lligada als
+permisos, que són seus. El contingut l'hi posem nosaltres.
+
+**Que ho preguntin vol dir que l'annex del 07/09 no l'han relacionat amb el cos del correu**: la
+carpeta destí i l'origen dels fitxers hi consten en una taula. Per això la resposta del 16/09
+repeteix el `New-Item` i el repartiment en comptes de remetre-los-hi. El repartiment **no s'ha mogut**
+respecte del 10/09, a propòsit: si cada correu canvia la frontera, es torna a discutir cada vegada.
+L'única cosa que s'hi ha afegit és qui crea la carpeta buida, que anava sobreentesa dins de «donar-me
+accés a `C:\Apps\SapB1AnalitzaSync`» — i la pregunta demostra que sobreentesa no estava.
+
+⚠️ **El compte de servei ja va per la tercera vegada.** El 07/09 no el van contestar, el 10/09 van
+entendre l'accés per a `ohijazo` i no el compte, i el 16/09 tampoc hi apareix. Si es deixa passar, la
+tasca acabarà corrent amb un usuari nominal, que és exactament el problema que ja tenim viu amb
+`OHijazo` a Service Layer. **Si a la resposta següent torna a no aparèixer `svc_gapi07` o
+equivalent, demanar-ho en un correu a part i com a línia única**, no dins d'una llista: dins d'una
+llista ja s'ha perdut tres vegades.
+
+De la resposta del 16/09 val la pena conservar-ne una comprovació: **`Test-Path
+C:\Apps\SapB1AnalitzaSync` ha de dir `False`**. Si digués `True`, hi ha alguna cosa que no hi hem
+posat nosaltres, i `AE01SAPRDP` allotja webservices de tercers: val més saber-ho abans de copiar-hi
+81 MB i tancar-hi els permisos NTFS a sobre.
+
+**El que continua obert amb ells:**
+
+| # | Què | Estat |
+|---|---|---|
+| 3 | Freqüència i retenció del backup d'`AE01SAPSQL` | **Segona vegada sense contestar.** Si a la tercera tampoc arriba, configurar el FULL diari pel nostre compte i informar-los |
+| 3 | On van els fitxers del FULL diari d'`IntercanviSAP` | Obert |
+| 6 | ¿Hi ha relay SMTP intern? | Obert. Si el 30/09 no hi ha resposta, muntar l'opció 3 (compte propi amb App Password) sense esperar-los |
+| 8 | Compte de servei + *Log on as a batch job* + accés a la carpeta | Obert, i és el que bloqueja la resta |
+| 8 | Registre de la tasca de les 02:45 (o el permís perquè la registrem nosaltres) | Obert. Està a la seva columna perquè registrar una tasca que corre amb un altre compte demana drets d'administrador |
+| — | Qui refresca `DB_FARINERA_TEST`, ells o Seidor | Obert. La pregunta és del 07/09 però no els va arribar fins al 10/09 |
 
 **Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al
 contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). ✅ **Sistemes van habilitar
