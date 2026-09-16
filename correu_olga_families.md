@@ -1,3 +1,22 @@
+> # ⛔ SUPERAT — NO ENVIAR (16/09/2026)
+>
+> Aquest correu li demana a l'Olga que triï entre tres opcions i que organitzi la classificació de
+> 782 articles. **Les dues coses han quedat sense sentit**: mesurat contra l'històric de vendes de
+> KAIS, el **98,53%** de la facturació passa pels articles que SAP ja té classificats, i dels 782
+> només **28 han facturat res** — la resta són recanvis, EPI's i palets que no es venen. La feina
+> real són **vuit articles**, i la proposta de família per a cadascun ja està calculada.
+>
+> Enviar-lo tal com està la faria decidir una cosa que els números ja han decidit, i li obriria un
+> projecte que no existeix.
+>
+> El detall i les xifres, a `docs/memoria_projecte.md`, *Les famílies: el problema dels 782 articles
+> no existia*. Si algun dia cal escriure-li, ha de ser per confirmar vuit línies, no per triar.
+>
+> Es conserva perquè la taula de facturació per família i el raonament de les tres opcions segueixen
+> sent bons; el que ha canviat és la pregunta.
+
+---
+
 # Correu a l'Olga — les famílies de producte a Analitza a partir del 2 de novembre
 
 **Per a:** Olga

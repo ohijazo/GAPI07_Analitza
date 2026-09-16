@@ -805,6 +805,75 @@ migració a Service Layer. Anar per l'API oficial *mitiga* el risc —era un del
 però no l'elimina. Val més tenir-ho contestat per escrit ara que descobrir-ho en una auditoria, i
 falten dos mesos per a productiva.
 
+### Les famílies: el problema dels 782 articles no existia (16/09/2026)
+
+Durant setmanes això va anar plantejat com una decisió comercial amb un projecte de classificació al
+darrere: **o 110 famílies (els grups d'article de SAP), o les 12 comercials amb 782 dels 980 articles
+actius sense classificar.** Es va arribar a escriure un correu a l'Olga perquè triés.
+
+**La premissa era falsa, i es va veure mesurant-ho.** Contra l'històric de vendes de KAIS
+(`bi_estadili`, 12 mesos, aplicant-hi **les mateixes set sèries que exclou Analitza**, perquè si no la
+xifra no és comparable):
+
+| | |
+|---|---|
+| Facturació considerada | 22.262.329 € |
+| **Passa per articles que SAP ja té classificats** | **98,53%** |
+| Articles sense família **amb vendes** | **28** de 782 |
+| Dels quals fan el 90% d'aquest import | **7** |
+
+Els altres 754 són recanvis, EPI's, palets, lubricants i material de fàbrica: **es compren i no es
+venen**, i per això Seidor només va classificar els 198 que formen el catàleg comercial de veritat. El
+1,47% que queda fora és el mateix ordre de magnitud que el calaix «sense assignació» que Analitza **ja
+té avui** (195.233 € de gener a agost). O sigui que mantenir les 12 famílies no empitjora res: li
+reprodueix la situació actual.
+
+La feina real són **vuit articles**, i la proposta surt de la subfamília que KAIS ja els assigna:
+
+| Article | Família |
+|---|---|
+| `30182` (B4) FARINA Nº1E — 111.790 € | FORÇA |
+| `01761` ESPECIFICA TURRIS — 62.675 € | MITJA FORÇA |
+| `30151` (B4) FARINA Nº1 — 54.276 € | FORÇA |
+| `34561` MIE CREME — 27.244 € | HAUBANNE |
+| `30751` (B4) FARINA SEGOL — 11.055 € | ALTRES CEREALS |
+| `30131` (B4) FARINA CROISSANT — 4.672 € | CAN TRULL |
+| `50150` / `50550` FARINA ECOLOGICA — 1.362 € | ECOLÒGICA |
+
+La resta de la llista són palets, sacs, serveis de transport i residus, que **han de continuar sense
+família**: no són producte i avui ja cauen al mateix calaix.
+
+#### KAIS no és la font, i omplir-ho des d'allà seria pitjor
+
+Es va explorar KAIS (`vkais\kais`, BD `GWSV_AGRI`) buscant-hi la classificació. **No hi és.**
+`ARTICLES.fam_codi` són famílies **internes de gestió** —PRODUCTE ACABAT, MANTENIMENT, SERVEIS,
+CONSUMIBLES, RESIDUS, FERRETERIA GENERAL—, 37 en ús i cap article buit. El literal `MOULIN` no surt
+enlloc de la base de dades. Les 12 famílies d'Analitza són **seves**, no una cosa que KAIS els enviés.
+
+`SUBFAMI` sí que porta el vocabulari (`FORÇA FC`, `INTEGRAL FC`, `PEDRA MC`… on `MC` és Moulin de
+Colagne) i està poblada als 2.055 articles, amb un encaix per `ItemCode` del **99,7%** contra SAP. Però
+poblar `U_SEIFamCialCat` des d'allà **injectaria cinquanta famílies de ferreteria** a l'anàlisi
+comercial de l'Olga. Serveix per proposar la família dels vuit articles; no per a un ompliment massiu.
+
+#### L'estat del codi
+
+`sap_raw.OITM.U_SEIFamCialCat` **es demanava al `$select` des del commit `70eabcb` i la sonda
+l'ensenyava, però no s'escrivia enlloc**: ni `MirrorTables` el portava ni la taula tenia la columna. Es
+baixava de SAP i es llençava, i per això cap consulta contra el mirall el trobava.
+
+Desplegat el 16/09/2026: columna al mirall, `MirrorTables` que l'escriu, i els dos SPs darrere de
+**`cfg.settings.FAMILY_FROM_COMMERCIAL`** (`'0'` = els 110 grups d'avui, `'1'` = les comercials).
+Validat que amb el flag a `'0'` la sortida és **idèntica** a `dbo`: 0 diferències a
+`est_families_productes` i a `est_productes`.
+
+Amb el flag a `'1'`, mesurat sobre el mirall real, sortirien **14 famílies**: les 12 de l'Adrià, més
+`SUBPRODUCTE` (que ell ja sabia que no té) i **`KM 0` amb un espai**, que és el duplicat conegut de
+`KM0` i té un sol article, inactiu. Corregir aquell nom a SAP les deixa en 13.
+
+⚠️ **Activar el flag fa desaparèixer 110 identificadors de cop.** `vanished_ids` saltarà com a
+`CRITICAL` i aturarà el swap, que és el comportament correcte. Cal apujar `ID_DROP_MAX` aquell dia i
+**tornar-lo a baixar l'endemà**, igual que al cutover. Es fa de dia i mirant-ho, no en un run desatès.
+
 ### Decisions pendents
 
 **Correu enviat a l'Adrià el 31/08/2026** (`resposta_adria_2.md` / `.docx`). Hi van cinc preguntes, i
@@ -813,8 +882,8 @@ tres bloquegen feina nostra amb data 1 de novembre:
 1. **El `/100`** — la urgent. Les seves SQL divideixen `product_price` i `product_cost` per 100 però
    no `net_amount`. O el treu ell el dia del tall, o els hi enviem multiplicats per 100, però s'ha de
    decidir: sense resposta és un error silenciós el dia 2. Si no contesta, insistir-hi sol.
-2. **Famílies**: els 110 grups de SAP (canvia la taxonomia) o la categoria comercial (la conserva,
-   però 1.776 de 2.028 articles no la tenen informada).
+2. ~~**Famílies**~~ ✅ **Resolt el 16/09/2026 amb xifres, no amb una decisió.** Veure *Les famílies:
+   el problema dels 782 articles no existia*, més avall.
 3. **Congelar el número d'adreça** al tall, o confiar en l'alarma `vanished_ids` (§6.5).
 4. **Si la seva càrrega acumula o substitueix** la finestra de 90 dies. Si substitueix, el problema
    del cost d'octubre és molt més gros del que ell descriu.
