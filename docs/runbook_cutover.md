@@ -28,6 +28,78 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 ---
 
+## Pas solt — activar les 12 famílies
+
+No és del dia del tall: es pot fer qualsevol dia **de dia i mirant-ho**, i millor com abans. El codi
+està desplegat i validat des del 16/09/2026; el que queda és el `UPDATE` i la comprovació.
+
+**0. Abans de res, que el run de la nit fos verd.** Si no ho era, això s'atura aquí.
+
+```sql
+SELECT TOP 3 run_id, started_at, finished_at, status, error_message
+FROM   IntercanviSAP.audit.etl_runs ORDER BY run_id DESC;
+
+SELECT check_name, severity, details
+FROM   IntercanviSAP.audit.data_quality_warnings
+WHERE  run_id = (SELECT MAX(run_id) FROM IntercanviSAP.audit.etl_runs);
+```
+
+**1. Opcional, però val la pena: arreglar `KM 0` a SAP.** Hi ha un article —de baixa— amb la família
+`KM 0` amb un espai, duplicant `KM0`. Corregit, les famílies queden en 13 en comptes de 14.
+
+**2. Apujar el llindar i activar el flag.** Les 110 famílies velles desapareixen de cop i
+`vanished_ids` ho ha de veure: per això s'apuja expressament, no perquè el check molesti.
+
+```sql
+UPDATE IntercanviSAP.cfg.settings SET [value] = '999999' WHERE [key] = 'ID_DROP_MAX';  -- avui: 10
+UPDATE IntercanviSAP.cfg.settings SET [value] = '1' WHERE [key] = 'FAMILY_FROM_COMMERCIAL';
+```
+
+**3. Executar en mode inspecció primer**, sense publicar res:
+
+```sql
+EXEC IntercanviSAP.etl.sp_run_all @SkipSwap=1;
+```
+
+I mirar `staging` abans de deixar-ho passar a `dbo`:
+
+```sql
+SELECT id_product_category, [name] FROM IntercanviSAP.staging.est_families_productes
+ORDER BY id_product_category;
+
+SELECT COUNT(*) AS productes,
+       SUM(CASE WHEN product_categories_id = '' THEN 1 ELSE 0 END) AS sense_familia
+FROM   IntercanviSAP.staging.est_productes;
+
+SELECT (SELECT COUNT(*) FROM IntercanviSAP.staging.est_linies_albara) AS linies_staging,
+       (SELECT COUNT(*) FROM IntercanviSAP.dbo.est_linies_albara)     AS linies_dbo;
+```
+
+El que ha de sortir: **13-14 famílies** amb noms reconeixibles, uns 1.776 productes sense família
+—recanvis i consumibles, és correcte—, i les **línies d'albarà iguals a les de `dbo`**: aquest canvi
+no les ha de tocar. Si les línies es mouen, aturar-se.
+
+**4. Publicar**, si el pas 3 quadra:
+
+```sql
+EXEC IntercanviSAP.etl.sp_run_all;
+```
+
+**5. ⚠️ Tornar a baixar `ID_DROP_MAX` de seguida, la mateixa sessió.**
+
+```sql
+UPDATE IntercanviSAP.cfg.settings SET [value] = '10' WHERE [key] = 'ID_DROP_MAX';
+```
+
+Es pot fer immediatament: un cop `dbo` porta les famílies noves, la nit següent `staging` i `dbo`
+coincideixen i el check ja no salta. **No deixar-ho per demà** — mentre el llindar estigui alt, la
+protecció contra un canvi massiu d'identificadors està desactivada per a tot, no només per a això.
+
+**6. Avisar l'Adrià** que el canvi ja és a la base de dades, perquè els ids de família que veurà són
+nous. Ho té acceptat i el correu del 16/09 l'hi anuncia, però la data li serveix.
+
+---
+
 ## Setmana del 27 al 31 d'octubre — preparació
 
 Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
