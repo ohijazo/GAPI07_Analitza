@@ -13,26 +13,21 @@ Hola Adrià,
 Gràcies per la teva resposta. He pogut tancar tres coses, n'he trobat una que val la pena que
 miris, i sobretot: **ja tens accés**.
 
-## La connexió ja està oberta
+## La connexió: el que ja t'he dit avui, per escrit
 
-Sistemes us van habilitar l'accés el **10 de setembre**. Entreu per VPN, igual que fèieu amb KAIS, i
-d'allà a `AE01SAPSQL`, port 1433, base de dades `IntercanviSAP`. Les credencials de la VPN i l'URL
-són les que ja teniu: aquí no ha canviat res.
+Per no repetir-m'hi, però perquè quedi al correu: Sistemes us van habilitar l'accés el **10 de
+setembre**, entreu per VPN com fèieu amb KAIS, i d'allà a `AE01SAPSQL`, port 1433, base de dades
+`IntercanviSAP`. Credencials de VPN i URL, les de sempre.
 
-**Però el compte de SQL sí que ha canviat, i això t'ho vull dir abans que ho provis.** El 31 d'agost
-vaig rotar la contrasenya d'`analitza_ro` i vaig acotar-li els permisos. Si ho proves amb la que
-tenies guardada, el que veuràs és un error de login que sembla un problema de xarxa, i el diagnòstic
-se'n va cap a Sistemes durant dies. **La contrasenya nova te l'envio per un canal a part**, no per
-correu.
+Les dues coses que t'he avançat avui:
 
-Els permisos ara són només el que necessites: `SELECT` sobre les vuit taules `est_*`. Abans el compte
-veia més coses de les que li tocaven i ho vaig tancar el mateix dia.
-
-⚠️ **Una cosa important sobre el que hi trobaràs.** De moment això apunta a la nostra SAP de
-**proves**, no a la productiva. Serveix perquè validis la connexió i el format, però **les dades que
-hi ha ara no s'han de carregar a l'Analitza de producció**: són de l'entorn de test i et durien
-clients i imports que no són reals. El pas a la companyia productiva el faig jo el 2 de novembre i
-t'aviso el mateix dia.
+- **La contrasenya d'`analitza_ro` va canviar el 31 d'agost** i els permisos es van acotar el mateix
+  dia (ara és `SELECT` només sobre les vuit taules `est_*`). La que tinguessis guardada no et
+  funcionarà, i el símptoma sembla un problema de xarxa. **Te la passo per un canal a part.**
+- **No carreguis res a producció encara.** Això apunta a la nostra SAP de **proves**, i des d'aquesta
+  nit les taules es refresquen cada dia: hi veuràs dades que semblen bones i no ho són. Per validar
+  connexió i format, tot el que vulguis. El pas a la companyia real el faig el 2 de novembre i
+  t'aviso el mateix dia.
 
 ## Fet: les adreces ja no es renumeren
 
@@ -118,43 +113,48 @@ et quedarien 100 vegades més petits, el `net_amount` seguiria quadrant, i ni le
 les meves ho veurien. Per això t'ho demano per escrit encara que ja m'ho hagis dit: amb un "confirmat"
 en tinc prou.
 
-## Famílies: hi havia una tercera opció, i ara tinc xifres
+## Famílies: mantenim les vostres 12, i ja no cal decidir res
 
-Repassant-ho amb les teves captures he vist que et vaig plantejar malament la tria. El camp que ja us
-alimenta la SUBFAMILIA és `U_SEISubFamCialCat`, i els seus valors quadren amb la vostra llista de
-subfamílies. Però **al costat n'hi ha un altre, `U_SEIFamCialCat`, que és el nivell FAMÍLIA**, i no
-l'estàvem mirant.
+Aquesta era la pregunta oberta i **ha quedat resolta amb números**, així que te l'explico i no te la
+trasllado.
 
-Els seus valors són, literalment, les vostres 12 famílies: TRADICIONALS, MOULIN DE COLAGNE,
-ESPECIFICA, GRANEL, ALTRES CEREALS, ECOLÒGIQUES, CAN TRULL, INTEGRALS, KM0, PIZZA, ALTRES
-ELABORACIONS i PROVES1. Més SUBPRODUCTE, que vosaltres no teniu.
+Et vaig plantejar malament la tria. El camp que us alimenta la SUBFAMILIA és `U_SEISubFamCialCat`,
+però al costat n'hi ha un altre, **`U_SEIFamCialCat`, que és el nivell FAMÍLIA**, i no l'estàvem
+mirant. Els seus valors són, literalment, les vostres 12.
 
-O sigui que les opcions reals són:
+El que em preocupava és que aquell camp només està informat en 198 dels 980 articles actius: semblava
+que **8 de cada 10 productes** us caurien a la fila «sense assignació». Ho he mesurat abans de
+moure'm, contra l'històric de vendes dels últims dotze mesos i aplicant-hi les mateixes set sèries
+que exclou la vostra SQL:
 
-| | Famílies | Cobertura |
-|---|---|---|
-| **A. Els grups d'article de SAP** | 110 | tots els articles classificats |
-| **B. La família comercial de SAP** | 12, les vostres | **782 de 980 articles actius sense família** |
+| | |
+|---|---|
+| Facturació considerada | 22.262.329 € |
+| **Passa per articles que ja tenen família** | **98,53%** |
+| Articles sense família **que hagin facturat res** | **28**, no 782 |
 
-L'opció A va en contra del que em recomanes: 110 famílies són moltes més de les ~25 que dius, i les
-alertes de la fitxa de client quedarien diluïdes. L'opció B manté el significat i els noms, però ara
-mateix vuit de cada deu articles actius cauria a la fila sense assignació —la que avui us val 195.233 €.
+Els altres 754 són recanvis, palets, equips de protecció, lubricants i material de fàbrica: **es
+compren i no es venen**, i per això ningú els va classificar mai. El 1,47% que queda fora és el mateix
+ordre de magnitud que la fila «sense assignació» que **ja teniu avui** (195.233 € de gener a agost).
+O sigui que mantenir les 12 no us empitjora res: us reprodueix la situació actual.
 
-Hi ha un camí C: **triar B i que algú d'aquí classifiqui els articles que falten a SAP abans del 2 de
-novembre.** Us puc passar la llista exacta d'articles actius sense família perquè es reparteixi.
+Així que fem això, sense donar-hi més voltes:
 
-**Aquesta és la que té data i la que m'amoïna.** Classificar 782 articles no és feina d'una tarda, no
-la puc fer jo, i queden set setmanes. Com que em deies que ho decideix el departament comercial,
-**li he escrit directament a l'Olga** amb aquestes xifres al davant i les tres opcions plantejades,
-per no perdre-hi una volta. T'hi poso en còpia si vols seguir-ho.
+- **Us enviem la família comercial**, no els 110 grups d'article de SAP.
+- **Els identificadors de família passen a ser el nom** (`TRADICIONALS`, `GRANEL`…), perquè a SAP
+  aquest camp no té cap codi al darrere. Ja em vas dir que et va bé que els ids de família canviïn.
+- **Vuit articles** —farines amb família evident, com `(B4) FARINA Nº1E` o `ESPECIFICA TURRIS`— els
+  omplim aquí abans del tall. És tota la feina de classificació que hi havia.
+- **Res per a l'Olga**: no cal que decideixi res ni que ningú classifiqui 782 articles. Si ho vols
+  comentar amb ella igualment, endavant, però jo no l'hi he portat.
 
-El que sí que et demano és el criteri: si a mitjans d'octubre això no està decidit, l'opció C ja no
-hi cap i caldrà triar entre deixar vuit de cada deu articles sense família (B) o passar-vos 110
-famílies (A). **Quina de les dues et fa menys mal a l'aplicació?** Ho pregunto ara perquè, si arriba
-el cas, no vull haver-ho de decidir jo amb pressa.
+Dues coses perquè no et sorprenguin el dia 2:
 
-De propina, una cosa petita: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si fossin dues famílies
-diferents. La segona té un sol article. Ho corregim aquí abans del tall.
+- Us apareixerà una família **`SUBPRODUCTE`** que vosaltres no teniu. És real, són 4 articles.
+- I una **`PROVES1`**, que ja teniu, amb 3 articles. Si la vols fora, digue-m'ho i la trec.
+
+De propina, una cosa petita que ja he comprovat: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si
+fossin dues famílies. La segona té un sol article i està de baixa. Ho corregeixo aquí abans del tall.
 
 ## Una pregunta petita
 
@@ -196,13 +196,17 @@ ohijazo@agrienergia.com
 > - **La secció del dia 2** és nova. El `discount` es queda com està —`1-discount` a la seva SQL
 >   confirma que la convenció actual ja és la bona—, i del `/100` es demana confirmació per escrit
 >   perquè el runbook l'exigeix i és l'únic punt que falla en silenci.
-> - **Les famílies**: s'escriu directament a l'Olga (`correu_olga_families.docx`, llest des del
->   07/09) i a l'Adrià se li **diu**, no se li pregunta. Passar-ho per ell afegia una volta que amb 47
->   dies no hi cap. A canvi se li demana el criteri per al pla B —si al final s'ha de triar entre A i
->   B, quina li fa menys mal—, que és una cosa que ell sí que sap i nosaltres no.
->
-> ⚠️ **Els dos correus s'han d'enviar el mateix dia, i el de l'Olga primer.** Si surt el de l'Adrià
-> dient «li he escrit» i el de l'Olga no ha sortit, queda malament i, pitjor, ningú no fa res.
+> - **Les famílies ja no són una pregunta.** Mesurat el 16/09 contra `bi_estadili` de KAIS: el 98,53%
+>   de la facturació passa pels 198 articles classificats, i dels 782 només 28 han facturat res. Es
+>   comunica la decisió en comptes de demanar-la. `correu_olga_families.md` queda **SUPERAT — NO
+>   ENVIAR**, i a l'Olga no se li escriu: no ha de decidir res.
+> - **La secció de la connexió s'ha escurçat**: l'avís de no carregar dades de test i el de la
+>   contrasenya rotada es van enviar per separat el 16/09, quan es va veure que `dbo.est_*` es
+>   refrescaria aquella mateixa nit per primer cop des del 24/08. Al correu hi queden com a
+>   constància, no com a novetat.
+> - El codi de les famílies **ja està desplegat i validat** darrere de `cfg.settings.FAMILY_FROM_COMMERCIAL`,
+>   que és a `'0'`. Activar-lo fa desaparèixer 110 identificadors i vol `ID_DROP_MAX` apujat aquell
+>   dia. O sigui que el que es promet en aquest correu està fet, no previst.
 >
 > **Pendent de fer immediatament després d'enviar-lo:** passar-li la contrasenya d'`analitza_ro` per
 > un canal que no sigui el correu.
