@@ -14,14 +14,14 @@ alguns passos d'aquest document ja no els executem nosaltres:
 | Sistemes | Nosaltres |
 |---|---|
 | ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ ✅ feta el 16/09/2026 | Copiar-hi els binaris |
-| ~~Crear el compte de servei~~ ✅ `AGRIENERGIA\sapsistemes` | Escriure-hi `appsettings.Production.json` |
+| ~~Crear el compte de servei~~ ✅ `AGRIENERGIA\sapsistema` | Escriure-hi `appsettings.Production.json` |
 | Donar-li *Log on as a batch job* | Provar la cadena de punta a punta |
-| Donar accés a la carpeta a `sapsistemes` **i** a `ohijazo`, i RDP a `ohijazo` | |
-| **Registrar la tasca** (punt 4), amb admin i amb `sapsistemes` | |
+| Donar accés a la carpeta a `sapsistema` **i** a `ohijazo`, i RDP a `ohijazo` | |
+| **Registrar la tasca** (punt 4), amb admin i amb `sapsistema` | |
 
 **Registrar la tasca és seu i no es negocia**: `Register-ScheduledTask -User <un altre compte>` demana
 drets d'administrador local, i fer-ho nosaltres voldria dir tenir admin en aquella màquina i la
-contrasenya de `sapsistemes` a les mans. Qui **crea** la tasca i qui la **executa** són coses
+contrasenya de `sapsistema` a les mans. Qui **crea** la tasca i qui la **executa** són coses
 independents — la tasca es guarda el seu principal a dins—, així que no en perdem res.
 
 ⚠️ **La carpeta no s'ha de compartir per xarxa.** Ni `\\ae01saprdp\...` ni cap altre recurs: hi ha un
@@ -79,9 +79,14 @@ dotnet publish P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -c Release -r win
 
 ## 2. El compte que executa la tasca
 
-És **`AGRIENERGIA\sapsistemes`**, el compte que va donar Sistemes el 16/09/2026. No és el teu, que
-era el requisit; sí que sembla que el comparteixen amb altres tasques seves de SAP en aquella
-màquina.
+És **`AGRIENERGIA\sapsistema`** (*SAP Sistema*), i és **dedicat**: `net user sapsistema /domain` el
+16/09/2026 el donava amb la contrasenya posada el **15/09** i *«Última sesión iniciada: Nunca»*, o
+sigui creat expressament per això. No és administrador —cap grup local, i com a global només
+*Usuarios del dominio*— i **la contrasenya no caduca**.
+
+⚠️ Per Teams el van anomenar `sapsistemes`, amb essa. **El compte real és `sapsistema`**, i
+`sapsistemes` no existeix al domini. La diferència d'una lletra entre el principal de la tasca i
+l'ACL de la carpeta donaria *Access Denied* cada nit a les 02:45 sense que res digués per què.
 
 Ha de poder:
 
@@ -96,9 +101,15 @@ No li cal ser administrador ni tocar res més de la màquina.
 (autenticació SQL, dins de l'`appsettings`); el compte de Windows només executa el procés. És una
 confusió fàcil i val la pena aturar-la abans que algú creï un login que no cal.
 
-⚠️ Com que el compte és de Sistemes, **si li roten la contrasenya la tasca s'atura silenciosament**:
-des de fora només es veurà que Analitza es queda amb les dades d'ahir. Està demanat que ens ho
-avisin; si el símptoma apareix sense cap altra explicació, aquesta és la primera hipòtesi.
+⚠️ El compte és de Sistemes i la contrasenya no la tenim. **No caduca**, així que el risc no és que
+s'aturi sola; el risc és que algú la roti a mà. Si passés, la tasca deixaria de funcionar i des de
+fora només es veuria que Analitza es queda amb les dades d'ahir. Està demanat que ens ho avisin, i si
+el símptoma apareix sense cap altra explicació, aquesta és la primera hipòtesi.
+
+⚠️ **Compte amb el dret *Log on as a batch job* si el gestiona una GPO.** Registrar la tasca sol
+concedir-lo automàticament a la màquina, però si aquell dret està definit per directiva de domini, el
+següent refresc de polítiques el torna a treure i **la tasca comença a fallar dies després**, sense
+que hagi canviat res de visible. Si és el cas, ha d'anar a la GPO, no posat a mà en local.
 
 ## 3. La configuració, i per què no va a variables d'entorn
 
@@ -140,7 +151,7 @@ comprovat res. Copia el CSV a la màquina i apunta-l'hi:
 Per al cicle nocturn (`--once`) és indiferent: aquest camí només el fa servir la sonda.
 
 La carpeta ha de quedar llegible **només pel compte de la tasca i pels administradors**. Sistemes la
-van crear el 16/09/2026 ja amb aquesta ACL —`sapsistemes`, administradors locals i administrador de
+van crear el 16/09/2026 ja amb aquesta ACL —`sapsistema`, administradors locals i administrador de
 domini—, o sigui que **normalment no cal tancar res**: només verificar-ho.
 
 ```powershell
@@ -153,7 +164,7 @@ administrador:
 
 ```powershell
 icacls C:\Apps\SapB1AnalitzaSync /inheritance:r
-icacls C:\Apps\SapB1AnalitzaSync /grant:r "AGRIENERGIA\sapsistemes:(OI)(CI)(RX)"
+icacls C:\Apps\SapB1AnalitzaSync /grant:r "AGRIENERGIA\sapsistema:(OI)(CI)(RX)"
 icacls C:\Apps\SapB1AnalitzaSync /grant:r "Administrators:(OI)(CI)(F)"
 icacls C:\Apps\SapB1AnalitzaSync /grant:r "SYSTEM:(OI)(CI)(F)"
 ```
@@ -169,7 +180,7 @@ màquina que no és nostra. Per això se'ls va demanar que **la creïn desactiva
 avisem.
 
 ```powershell
-$acc = "AGRIENERGIA\sapsistemes"
+$acc = "AGRIENERGIA\sapsistema"
 $act = New-ScheduledTaskAction -Execute "C:\Apps\SapB1AnalitzaSync\SapB1AnalitzaSync.Worker.exe" `
                                -Argument "--once" `
                                -WorkingDirectory "C:\Apps\SapB1AnalitzaSync"
@@ -186,7 +197,7 @@ Register-ScheduledTask -TaskName "GAPI07 Refresca sap_raw" `
 
 ⚠️ **Llançar `SapB1AnalitzaSync.Worker.exe --once` a mà des de la sessió d'`ohijazo` no substitueix
 aquesta prova.** Correria amb un altre compte, i el que s'ha de validar és justament que
-`sapsistemes` arriba a `AE01SAPSQL` pels dos ports i pot escriure a `sap_raw`. Cal llançar **la
+`sapsistema` arriba a `AE01SAPSQL` pels dos ports i pot escriure a `sap_raw`. Cal llançar **la
 tasca**: o ho fem nosaltres si ens donen permís sobre aquella tasca, o la llancen ells i ens diuen el
 `LastTaskResult`.
 
