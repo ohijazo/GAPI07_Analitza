@@ -1,4 +1,4 @@
-# Resposta a l'Adrià (Analitza CM) — adreces fetes, un avís sobre la data mínima, i xifres per a l'Olga
+# Resposta a l'Adrià (Analitza CM) — la connexió ja està oberta, adreces fetes, i xifres per a l'Olga
 
 **Per a:** adria@analitza.com
 **CC:** lbutinya@agrienergia.com
@@ -10,8 +10,29 @@
 
 Hola Adrià,
 
-Gràcies, amb la teva resposta he pogut tancar tres coses i n'he trobat una que val la pena que
-miris.
+Gràcies per la teva resposta. He pogut tancar tres coses, n'he trobat una que val la pena que
+miris, i sobretot: **ja tens accés**.
+
+## La connexió ja està oberta
+
+Sistemes us van habilitar l'accés el **10 de setembre**. Entreu per VPN, igual que fèieu amb KAIS, i
+d'allà a `AE01SAPSQL`, port 1433, base de dades `IntercanviSAP`. Les credencials de la VPN i l'URL
+són les que ja teniu: aquí no ha canviat res.
+
+**Però el compte de SQL sí que ha canviat, i això t'ho vull dir abans que ho provis.** El 31 d'agost
+vaig rotar la contrasenya d'`analitza_ro` i vaig acotar-li els permisos. Si ho proves amb la que
+tenies guardada, el que veuràs és un error de login que sembla un problema de xarxa, i el diagnòstic
+se'n va cap a Sistemes durant dies. **La contrasenya nova te l'envio per un canal a part**, no per
+correu.
+
+Els permisos ara són només el que necessites: `SELECT` sobre les vuit taules `est_*`. Abans el compte
+veia més coses de les que li tocaven i ho vaig tancar el mateix dia.
+
+⚠️ **Una cosa important sobre el que hi trobaràs.** De moment això apunta a la nostra SAP de
+**proves**, no a la productiva. Serveix perquè validis la connexió i el format, però **les dades que
+hi ha ara no s'han de carregar a l'Analitza de producció**: són de l'entorn de test i et durien
+clients i imports que no són reals. El pas a la companyia productiva el faig jo el 2 de novembre i
+t'aviso el mateix dia.
 
 ## Fet: les adreces ja no es renumeren
 
@@ -78,6 +99,25 @@ posterior al tall.
 I sí, et confirmo el que preguntaves: **el tall és sec**. L'1 de novembre s'insereix a l'antiga i el
 2 a la nova, i no hi ha cap dia amb els dos sistemes rebent les mateixes operacions.
 
+## El dia 2: què fa cadascú
+
+Com que ja tenim data i falten set setmanes, m'agradaria deixar per escrit qui toca què aquell dia.
+Són dues coses i només una demana feina:
+
+| | Qui | Què |
+|---|---|---|
+| **El `/100`** | Tu | Treure `product_price/100` i `product_cost/100` de la teva SQL. Nosaltres enviem euros des del primer dia |
+| **El `discount`** | Ningú | **Es queda com està.** Seguiu fent `1-discount` i no toqueu res |
+
+El del `discount` el dic expressament perquè no es toqui: vaig estar a punt de canviar-vos la
+convenció i, mirant la vostra SQL, la que hi ha ara ja és la bona. Millor no moure el que funciona el
+mateix dia que movem tota la resta.
+
+El del `/100` és l'únic punt de tot el projecte que, si se'ns escapa, **no dona cap error**: els preus
+et quedarien 100 vegades més petits, el `net_amount` seguiria quadrant, i ni les teves validacions ni
+les meves ho veurien. Per això t'ho demano per escrit encara que ja m'ho hagis dit: amb un "confirmat"
+en tinc prou.
+
 ## Famílies: hi havia una tercera opció, i ara tinc xifres
 
 Repassant-ho amb les teves captures he vist que et vaig plantejar malament la tria. El camp que ja us
@@ -103,8 +143,11 @@ mateix vuit de cada deu articles actius cauria a la fila sense assignació —la
 Hi ha un camí C: **triar B i que algú d'aquí classifiqui els articles que falten a SAP abans del 2 de
 novembre.** Us puc passar la llista exacta d'articles actius sense família perquè es reparteixi.
 
-Ho passo a l'Olga, com dius. Digue'm si prefereixes que li escrigui jo amb aquestes xifres al davant
-o si ho porteu vosaltres.
+**Aquesta és la que té data i la que m'amoïna.** Classificar 782 articles no és feina d'una tarda, no
+la puc fer jo, i queden set setmanes. Digue'm si li escric jo directament a l'Olga amb aquesta taula
+al davant o si ho porteu vosaltres — el que sigui més ràpid, però convindria decidir-ho aquesta
+setmana. Si arribem a mitjans d'octubre sense resposta, tiraré per l'opció A i ho parlem després,
+perquè és la que no deixa vuit de cada deu articles sense classificar.
 
 De propina, una cosa petita: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si fossin dues famílies
 diferents. La segona té un sol article. Ho corregim aquí abans del tall.
@@ -121,12 +164,10 @@ Relacionat: el deute pendent dels vostres clients **sí que us arribarà** el di
 pendents es migren com a factures de servei amb el número i la data originals de KAIS, i nosaltres
 les recollim. Sense això, el dia 2 el deute hauria semblat esfumar-se.
 
-## El cost i la connexió
+## El cost
 
-- **El cost d'octubre**: d'acord, queda amb el cost del moment i al desembre fem la càrrega puntual
-  des de la base de dades antiga. Ho preparo amb temps.
-- **La connexió**: hi estic al damunt. És el punt que ens bloqueja a tots dos i us el confirmo tan
-  bon punt tingui la ruta.
+**El cost d'octubre**: d'acord, queda amb el cost del moment i al desembre fem la càrrega puntual des
+de la base de dades antiga. Ho preparo amb temps.
 
 Salutacions,
 Oscar Hijazo
@@ -136,6 +177,26 @@ ohijazo@agrienergia.com
 ---
 
 > **Nota interna (no enviar).**
+>
+> **Actualitzat el 16/09/2026.** L'esborrany era de l'01/09 i es va quedar quinze dies sense enviar.
+> El que ha canviat des de llavors:
+>
+> - **La connexió ja no bloqueja**: Sistemes van habilitar l'accés d'Analitza el 10/09/2026. Entren
+>   per VPN, com sempre. La secció que deia "hi estic al damunt" ja no té sentit.
+> - **Cal avisar de la rotació d'`analitza_ro`.** Sistemes els ho van comunicar com «les credencials
+>   i l'url són les mateixes, no ha canviat res»: per la VPN és cert, pel login de SQL **no**. La
+>   contrasenya va canviar el 31/08 i els permisos es van acotar el mateix dia. Si no s'avisa, el
+>   símptoma és un login fallit que sembla xarxa i el diagnòstic se'n va cap a Sistemes.
+> - **S'hi afegeix l'avís de no carregar dades de test a producció.** Apunta a `DB_FARINERA_TEST` i
+>   els ids que en surten no són tots els de KAIS. Si els ingereixen, els entren com a clients nous.
+> - **La secció del dia 2** és nova. El `discount` es queda com està —`1-discount` a la seva SQL
+>   confirma que la convenció actual ja és la bona—, i del `/100` es demana confirmació per escrit
+>   perquè el runbook l'exigeix i és l'únic punt que falla en silenci.
+> - **Les famílies porten data i ultimàtum tou**: si a mitjans d'octubre no hi ha resposta de l'Olga,
+>   opció A. Sense un límit, això no es decideix mai i els 782 articles no es classifiquen.
+>
+> **Pendent de fer immediatament després d'enviar-lo:** passar-li la contrasenya d'`analitza_ro` per
+> un canal que no sigui el correu.
 >
 > **Fet i commitejat l'01/09/2026:**
 > - `cfg.client_ship_no` + `etl.sp_assign_client_ship_no`; `etl.vw_client_ship` passa a llegir el
@@ -150,14 +211,11 @@ ohijazo@agrienergia.com
 > mínima serà el 2 de novembre, i `est_cobraments` no quedarà buida perquè les factures de servei
 > són `OINV` obertes.
 >
-> **El que depèn de tercers i no s'ha mogut:** desplegar el Worker i obrir la ruta (Sistemes) i la
-> llicència de l'usuari tècnic de SAP.
+> **El que depèn de tercers:** ~~desplegar el Worker~~ ✅ fet el 16/09/2026; queda que Sistemes
+> registrin la tasca de les 02:45. I la llicència de l'usuari tècnic de SAP, que no s'ha mogut.
 >
 > **Els 782 articles actius sense família** són una feina de classificació que no és nostra, i té
 > data. Si l'Olga tria l'opció B sense que això es faci, el dia 2 vuit de cada deu articles li surten
 > sense família i el problema es veurà a la seva aplicació, no a la nostra.
->
-> **Pendent de decidir amb l'Olga**, no amb l'Adrià. Val la pena escriure-li directament amb la taula
-> de dalt: la pregunta «110 o 12» sense la xifra de cobertura al costat no es pot contestar bé.
 >
 > **`cfg.client_ship_no` ha d'entrar al backup.** No es pot regenerar.

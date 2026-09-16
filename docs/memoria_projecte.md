@@ -228,19 +228,26 @@ La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2
 **24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
 notava perquè no havia canviat res.
 
-✅ **Desplegat el 16/09/2026.** El Worker ja és a `C:\Apps\SapB1AnalitzaSync` d'`AE01SAPRDP`, amb
-l'`appsettings.Production.json` escrit, i s'hi ha executat `--once` a mà: **19 segons**, amb `OITM`
-2.028, `OITB` 110 i `OSLP` 49 — les xifres del run 91. Des d'aquella màquina es veu Service Layer,
-s'hi autentica, i `gapi07_worker` escriu al mirall.
+✅ **Desplegat i corrent des del 16/09/2026.** El Worker és a `C:\Apps\SapB1AnalitzaSync`
+d'`AE01SAPRDP` i la tasca **`GAPI07 Refresca sap_raw`** el llança cada dia a les **02:45** amb
+`AGRIENERGIA\sapsistema`.
 
-**El que encara no està provat és `sapsistema`.** La prova del 16/09 va córrer amb `ohijazo`, i el
-compte de la tasca no es pot validar des del nostre costat. Fins que la tasca de les 02:45 no corri,
-el job de les 03:00 continua avortant amb `ABORTED_STALE_MIRROR`, que és correcte: no publica res.
-**No apujar `MIRROR_MAX_AGE_HOURS` per fer-lo callar.**
+**Provat pel camí real, no per l'aproximat.** La prova del migdia (`--once` a mà, 19 s, `OITM` 2.028
+/ `OITB` 110 / `OSLP` 49, les xifres del run 91) corria amb `ohijazo` i **no demostrava res sobre el
+compte de la tasca**. La prova bona és la de les **15:20:48**: Sistemes van llançar la tasca, va
+tornar `LastTaskResult = 0`, i `sap_raw.sync_state` va quedar amb **les nou entitats** segellades a
+les 13:21 UTC. Codi de sortida **i** dada escrita.
 
-Es va demanar a Sistemes el 07/09/2026 i es va desbloquejar tot **el 16/09 per Teams**, en una tarda,
-després que tres correus no ho haguessin mogut. La cronologia és a §9, *El fil amb Sistemes*; el
-procediment i els errors que ja han passat, a `deploy/README.md`.
+Es va demanar a Sistemes el 07/09/2026 i es va fer tot **el 16/09 per Teams**, en una tarda, després
+que tres correus no ho haguessin mogut. La cronologia és a §9, *El fil amb Sistemes*; el procediment
+i els errors que ja han passat, a `deploy/README.md`.
+
+⚠️ **El dret *Log on as a batch job* de `sapsistema` està posat per directiva local, no per GPO.**
+Sistemes ho van decidir així i han dit que si desapareix ja faran la GPO de domini. El que s'ha de
+saber és **com es veurà si passa**: no petarà res de visible: la tasca deixarà de córrer, el mirall
+es farà vell, el job de les 03:00 avortarà amb `ABORTED_STALE_MIRROR` i Analitza es quedarà congelada
+amb les dades del dia abans. Es detecta a `audit.etl_runs` l'endemà al matí, i el que s'ha de fer
+llavors és avisar-los, **no** apujar `MIRROR_MAX_AGE_HOURS`.
 
 **Quatre comptes diferents, i els crea gent diferent:**
 
@@ -975,6 +982,10 @@ retenció del backup d'`AE01SAPSQL`; compte SMTP per a Database Mail. ~~Accés d
 | 16/09/2026 | Nosaltres | **No**, cap recurs compartit. El que cal és RDP + NTFS |
 | 16/09/2026 | Sistemes | Concedeixen RDP i `(F)` sobre la carpeta |
 | 16/09/2026 | Nosaltres | **Worker desplegat i `--once` verd en 19 s.** Queda que registrin la tasca |
+| 16/09/2026 | Sistemes | *«l'he fet com a tasca local, i ja porta un parell de dies configurada»* — es referien al **dret**, no a la tasca: a `AE01SAPRDP` no hi havia cap tasca nostra |
+| 16/09/2026 | Nosaltres | Ho comprovem i els ho diem sense donar-hi voltes: de 156 tasques, 155 de Windows i una de l'Adobe |
+| 16/09/2026 | Sistemes | Registren `GAPI07 Refresca sap_raw` i la llancen: **`LastTaskResult = 0`** |
+| 16/09/2026 | Nosaltres | Verificat contra `sync_state`: les nou entitats segellades a l'hora de la tasca. **Punt 8 tancat** |
 
 ##### El desplegament, i les tres hores que va costar
 
@@ -1107,9 +1118,9 @@ donar d'alta enlloc de SQL Server; només executa el procés.
 | 8 | ~~Accés d'`ohijazo` a `AE01SAPRDP`~~ | ✅ **16/09/2026**: RDP concedit (primer intent: `0x3`/`0x9`, que és *no autoritzat per a inici de sessió remot*, no xarxa) i `(OI)(CI)(F)` sobre la carpeta |
 | 8 | ~~Sortida de `.239` cap a `.238`, ports 50000 i 1433~~ | ✅ **Ja hi passava.** Comprovat des de la màquina amb `Test-NetConnection`: no calia cap regla de firewall |
 | 8 | ~~¿`sapsistema` és admin i es comparteix?~~ | ✅ **No a totes dues.** Compte dedicat, creat el 15/09, sense grups locals i amb contrasenya que no caduca |
-| 8 | *Log on as a batch job* per a `sapsistema` | **Obert i no comprovable sense admin.** Si falta, la tasca es registra igual i falla cada nit amb `0x4`. I si el dret el gestiona una GPO, ha d'anar a la GPO o el següent refresc el treu |
-| 8 | Registre de la tasca de les 02:45 | Acordat que la fan ells, amb admin i amb `sapsistema`. **Demanat que la creïn desactivada** i que l'activin quan els fitxers hi siguin |
-| 8 | Poder llançar la tasca un cop per provar-la | Obert. N'hi ha prou que la llancin ells i ens diguin el resultat |
+| 8 | ~~*Log on as a batch job* per a `sapsistema`~~ | ✅ **16/09/2026**, per **directiva local**. Si algun dia una GPO el tomba, el símptoma són dades congelades, no un error |
+| 8 | ~~Registre de la tasca de les 02:45~~ | ✅ **16/09/2026**: `GAPI07 Refresca sap_raw`, arrel, diària 02:45, `sapsistema` |
+| 8 | ~~Provar-la~~ | ✅ **16/09/2026 15:20:48**, `LastTaskResult = 0` i `sync_state` refrescat |
 | — | Qui refresca `DB_FARINERA_TEST`, ells o Seidor | Obert. La pregunta és del 07/09 però no els va arribar fins al 10/09 |
 
 **Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al

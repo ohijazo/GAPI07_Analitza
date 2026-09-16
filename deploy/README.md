@@ -6,16 +6,38 @@ El Worker corre com a **tasca programada** al servidor d'aplicacions
 **AE01SAPRDP allotja webservices de col·laboradors externs.** Això condiciona com s'hi posen les
 credencials: res de variables d'entorn de màquina, que qualsevol procés de la màquina pot llegir.
 
-## Estat: desplegat el 16/09/2026, falta la tasca
+## Estat: en producció des del 16/09/2026
 
-El Worker **ja corre a `AE01SAPRDP`**. Aquell dia s'hi va copiar, configurar i executar a mà:
-`--once` va acabar en **19 segons**, amb `OITM` 2.028, `OITB` 110 i `OSLP` 49 — les mateixes xifres
-que el run 91, o sigui que el mirall surt bé des d'aquella màquina.
+El Worker corre a `AE01SAPRDP` per la tasca **`GAPI07 Refresca sap_raw`** (arrel, diària **02:45**,
+`AGRIENERGIA\sapsistema`). Provat el mateix dia a les 15:20:48: `LastTaskResult = 0` **i** les nou
+entitats de `sap_raw.sync_state` segellades a la mateixa hora.
 
-El que **encara no està provat** és que funcioni amb `sapsistema`: la prova del 16/09 va córrer amb
-`ohijazo`, i això no valida el compte de la tasca. Fins que la tasca de les 02:45 no corri, el job de
-les 03:00 avorta cada nit amb `ABORTED_STALE_MIRROR`, que és el comportament correcte. **No apugis
-`MIRROR_MAX_AGE_HOURS` per fer-lo callar.**
+Les dues proves no valen igual, i és la lliçó del dia: `--once` llançat a mà amb `ohijazo` diu que
+els binaris i la configuració són bons, però **no diu res del compte que correrà de nit**. La que
+compta és la tasca, llançada pel seu principal, verificada contra `sync_state`.
+
+⚠️ El dret *Log on as a batch job* de `sapsistema` està per **directiva local**, no per GPO. Si un
+refresc de polítiques el tomba, no petarà res: la tasca deixarà de córrer, el job de les 03:00
+avortarà amb `ABORTED_STALE_MIRROR` i Analitza es quedarà amb les dades d'ahir. Es veu a
+`audit.etl_runs`; la resposta és avisar Sistemes, **no** apujar `MIRROR_MAX_AGE_HOURS`.
+
+### Com es vigila, si no veiem la tasca
+
+`ohijazo` **no pot llegir la tasca**: la va crear un administrador i el descriptor de seguretat no li
+dona accés. `Get-ScheduledTask -TaskName "GAPI07 Refresca sap_raw"` respon *no se encontraron
+objetos*, tot i que enumerar-ne 156 sí que pot. O sigui que `LastTaskResult` l'hem de demanar a
+Sistemes.
+
+No cal: **es vigila des de la base de dades, que és un senyal millor.** Un `0` només diu que el
+procés va acabar; això diu que va escriure:
+
+```sql
+SELECT entity, updated_at, DATEDIFF(MINUTE, updated_at, SYSUTCDATETIME()) AS fa_minuts
+FROM   IntercanviSAP.sap_raw.sync_state ORDER BY updated_at DESC;
+```
+
+Les nou entitats han de portar l'hora de l'última execució. Compte que `updated_at` és **UTC**: la
+prova del 16/09 va córrer a les 15:20 locals i hi consta com a 13:21.
 
 ## Qui fa què (acordat amb Sistemes el 16/09/2026)
 
