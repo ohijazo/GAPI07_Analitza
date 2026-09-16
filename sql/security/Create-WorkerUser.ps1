@@ -34,8 +34,22 @@ function Read-Plain([string]$prompt) {
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 }
 
+# La contrasenya NO va interpolada dins de la cadena de connexio.
+#
+# "Password=$pwd;Encrypt=False" es trenca si la contrasenya porta ';', '=' o
+# cometes: el client no arriba ni a preguntar-ho al servidor i el que veus es un
+# "Login failed" que sembla una credencial dolenta. Amb SqlCredential la
+# contrasenya viatja a part i no passa mai pel parser de la cadena.
+function New-SqlConn([string]$server, [string]$db, [string]$user, [string]$plainPwd) {
+    $sec = ConvertTo-SecureString $plainPwd -AsPlainText -Force
+    $sec.MakeReadOnly()
+    $cred = New-Object System.Data.SqlClient.SqlCredential($user, $sec)
+    return New-Object System.Data.SqlClient.SqlConnection(
+        "Server=$server;Database=$db;Encrypt=False;TrustServerCertificate=True;Connection Timeout=15", $cred)
+}
+
 Write-Host ""
-Write-Host "Crear el login '$Login' a $Server" -ForegroundColor Cyan
+Write-Host "Crear o reajustar el login '$Login' a $Server" -ForegroundColor Cyan
 Write-Host ""
 
 $adminPwd = Read-Plain "Contrasenya de $AdminUser (per connectar)"
@@ -48,8 +62,7 @@ if ($newPwd.Length -lt 16) {
     exit 1
 }
 
-$conn = New-Object System.Data.SqlClient.SqlConnection `
-    "Server=$Server;Database=master;User Id=$AdminUser;Password=$adminPwd;Encrypt=False;TrustServerCertificate=True;Connection Timeout=15"
+$conn = New-SqlConn $Server 'master' $AdminUser $adminPwd
 $conn.Open()
 
 function Exec([string]$db, [string]$sql, [hashtable]$params = @{}) {
@@ -141,8 +154,7 @@ DENY CONNECT TO [$Login];
     # comptes del SELECT final: era l'altre bug del 27/08/2026.
     Write-Host ""
     try {
-        $test = New-Object System.Data.SqlClient.SqlConnection `
-            "Server=$Server;Database=IntercanviSAP;User Id=$Login;Password=$newPwd;Encrypt=False;TrustServerCertificate=True;Connection Timeout=15"
+        $test = New-SqlConn $Server 'IntercanviSAP' $Login $newPwd
         $test.Open()
         Write-Host ("  Es connecta com a {0} : si (a {1})" -f $Login, $test.Database) -ForegroundColor Green
 

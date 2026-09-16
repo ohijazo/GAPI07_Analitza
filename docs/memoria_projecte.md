@@ -228,13 +228,19 @@ La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2
 **24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
 notava perquè no havia canviat res.
 
-**Bloquejat**: no tenim accés a `AE01SAPRDP`. Fins llavors el job de les 03:00 avortarà amb
-`ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
+✅ **Desplegat el 16/09/2026.** El Worker ja és a `C:\Apps\SapB1AnalitzaSync` d'`AE01SAPRDP`, amb
+l'`appsettings.Production.json` escrit, i s'hi ha executat `--once` a mà: **19 segons**, amb `OITM`
+2.028, `OITB` 110 i `OSLP` 49 — les xifres del run 91. Des d'aquella màquina es veu Service Layer,
+s'hi autentica, i `gapi07_worker` escriu al mirall.
 
-**Demanat a Sistemes el 07/09/2026.** El **16/09/2026**, per Teams, es va desbloquejar en una tarda
-el que tres correus no havien mogut: la carpeta ja existeix i el compte de servei també. El detall,
-a §9, *El fil amb Sistemes*. El que encara falta és **l'accés d'`ohijazo` a la màquina** (RDP i
-permís NTFS a la carpeta) i la tasca, que registren ells.
+**El que encara no està provat és `sapsistema`.** La prova del 16/09 va córrer amb `ohijazo`, i el
+compte de la tasca no es pot validar des del nostre costat. Fins que la tasca de les 02:45 no corri,
+el job de les 03:00 continua avortant amb `ABORTED_STALE_MIRROR`, que és correcte: no publica res.
+**No apujar `MIRROR_MAX_AGE_HOURS` per fer-lo callar.**
+
+Es va demanar a Sistemes el 07/09/2026 i es va desbloquejar tot **el 16/09 per Teams**, en una tarda,
+després que tres correus no ho haguessin mogut. La cronologia és a §9, *El fil amb Sistemes*; el
+procediment i els errors que ja han passat, a `deploy/README.md`.
 
 **Quatre comptes diferents, i els crea gent diferent:**
 
@@ -967,6 +973,27 @@ retenció del backup d'`AE01SAPSQL`; compte SMTP per a Database Mail. ~~Accés d
 | 16/09/2026 | Nosaltres | L'ACL és la correcta, però `ohijazo` no hi és: cal permís de modificació **i** poder entrar a la màquina |
 | 16/09/2026 | Sistemes | *«s'ha de poder veure aquesta carpeta? des de qualsevol pc? si fas `\\ae01saprdp\` ho has de poder veure?»* |
 | 16/09/2026 | Nosaltres | **No**, cap recurs compartit. El que cal és RDP + NTFS |
+| 16/09/2026 | Sistemes | Concedeixen RDP i `(F)` sobre la carpeta |
+| 16/09/2026 | Nosaltres | **Worker desplegat i `--once` verd en 19 s.** Queda que registrin la tasca |
+
+##### El desplegament, i les tres hores que va costar
+
+Un cop dins de la màquina, la còpia i la configuració van ser deu minuts. La resta va ser SQL Server,
+i les tres coses que ho van entretenir val la pena tenir-les localitzades:
+
+1. **El login del Worker no s'havia pogut connectar mai** (error 916). Detall a
+   `deploy/README.md` i al commit del dia. Vint dies latent perquè ningú l'havia fet servir.
+2. **Una hipòtesi meva dolenta**: vaig apostar per `DEFAULT_DATABASE = master` i ja era
+   `IntercanviSAP`. La causa era el `DENY CONNECT`, que havia deixat per després per no tocar
+   `master`. Va costar una volta.
+3. **`sa` semblava rotada i no ho estava.** La primera prova interpolava la contrasenya dins de la
+   cadena de connexió; amb `SqlCredential` va entrar a la primera. Va fer perdre una estona
+   plantejant-se demanar-la a Sistemes.
+
+I dues coses que **no** van ser problema, però que ho semblaven: la sortida als ports 50000 i 1433 ja
+funcionava (la regla de firewall del 07/09 no calia), i un parell de fallades van ser text enganxat
+malament a la consola, no errors reals. En una sessió de RDP els blocs llargs de PowerShell es
+trenquen: enganxar poques línies i curtes.
 
 **La resposta del matí, per no tornar-la a buscar:** la carpeta va a **`AE01SAPRDP`**
 (192.168.11.239). A `AE01SAPSQL` no hi va res de nou —ja hi corre el job de les 03:00 i a partir del

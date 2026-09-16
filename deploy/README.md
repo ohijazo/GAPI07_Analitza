@@ -6,6 +6,17 @@ El Worker corre com a **tasca programada** al servidor d'aplicacions
 **AE01SAPRDP allotja webservices de col·laboradors externs.** Això condiciona com s'hi posen les
 credencials: res de variables d'entorn de màquina, que qualsevol procés de la màquina pot llegir.
 
+## Estat: desplegat el 16/09/2026, falta la tasca
+
+El Worker **ja corre a `AE01SAPRDP`**. Aquell dia s'hi va copiar, configurar i executar a mà:
+`--once` va acabar en **19 segons**, amb `OITM` 2.028, `OITB` 110 i `OSLP` 49 — les mateixes xifres
+que el run 91, o sigui que el mirall surt bé des d'aquella màquina.
+
+El que **encara no està provat** és que funcioni amb `sapsistema`: la prova del 16/09 va córrer amb
+`ohijazo`, i això no valida el compte de la tasca. Fins que la tasca de les 02:45 no corri, el job de
+les 03:00 avorta cada nit amb `ABORTED_STALE_MIRROR`, que és el comportament correcte. **No apugis
+`MIRROR_MAX_AGE_HOURS` per fer-lo callar.**
+
 ## Qui fa què (acordat amb Sistemes el 16/09/2026)
 
 La màquina no és nostra i no hi som administradors. El repartiment és aquest, i explica per què
@@ -13,11 +24,15 @@ alguns passos d'aquest document ja no els executem nosaltres:
 
 | Sistemes | Nosaltres |
 |---|---|
-| ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ ✅ feta el 16/09/2026 | Copiar-hi els binaris |
-| ~~Crear el compte de servei~~ ✅ `AGRIENERGIA\sapsistema` | Escriure-hi `appsettings.Production.json` |
-| Donar-li *Log on as a batch job* | Provar la cadena de punta a punta |
-| Donar accés a la carpeta a `sapsistema` **i** a `ohijazo`, i RDP a `ohijazo` | |
+| ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ ✅ 16/09/2026 | ~~Copiar-hi els binaris~~ ✅ 16/09/2026 |
+| ~~Crear el compte de servei~~ ✅ `AGRIENERGIA\sapsistema` | ~~Escriure-hi `appsettings.Production.json`~~ ✅ 16/09/2026 |
+| ~~Donar accés a la carpeta i RDP a `ohijazo`~~ ✅ 16/09/2026 | Provar la cadena amb la tasca, un cop registrada |
+| Donar a `sapsistema` *Log on as a batch job* | |
 | **Registrar la tasca** (punt 4), amb admin i amb `sapsistema` | |
+
+La sortida de `192.168.11.239` cap a `192.168.11.238` pels ports **50000 i 1433 ja funcionava**
+—comprovat amb `Test-NetConnection` des de la màquina el 16/09/2026—, o sigui que la regla de
+firewall que es va demanar el 07/09 no calia.
 
 **Registrar la tasca és seu i no es negocia**: `Register-ScheduledTask -User <un altre compte>` demana
 drets d'administrador local, i fer-ho nosaltres voldria dir tenir admin en aquella màquina i la
@@ -213,7 +228,20 @@ Get-ScheduledTaskInfo -TaskName "GAPI07 Refresca sap_raw" | Format-List TaskName
 | 0 | Correcte |
 | 1 | El cicle ha fallat: mira el log de la consola |
 | 3 | Falta configuració: l'`appsettings.json` encara té els placeholders |
+| 4 | Falta *Log on as a batch job* al compte de la tasca |
 | 2147942401 | No troba l'executable, o el compte no hi té permisos |
+
+### Errors de SQL Server que ja han passat
+
+| Error | Símptoma | Causa i solució |
+|---|---|---|
+| **916** | `The server principal "gapi07_worker" is not able to access the database "master"` | El login té un usuari amb `DENY CONNECT` a `master`. Allà el `DENY` no protegeix res i **impedeix autenticar-se**, encara que la cadena demani `IntercanviSAP`. `DROP USER [gapi07_worker]` a `master`. Passat el 16/09/2026; `Create-WorkerUser.ps1` ja no el posa i el neteja si el troba |
+| **18456** | `Login failed for user '<x>'`, **sense** anomenar cap base de dades | Credencial dolenta de debò. Si és 916 en canvi, la contrasenya és correcta i el que falla és el context de BD — no la busquis |
+
+⚠️ Si has de connectar-te per PowerShell, **passa la contrasenya per `SqlCredential`**, no interpolada
+a la cadena (`Password=$pwd;…`). Una contrasenya amb `;`, `=` o cometes trenca el parser del client i
+el que veus és un `Login failed` que sembla una credencial dolenta sense ser-ho. Els tres scripts de
+`sql/security/` ja ho fan així des del 16/09/2026.
 
 I des de SQL Server, la comprovació que de veritat importa:
 
