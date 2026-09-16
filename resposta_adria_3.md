@@ -144,10 +144,14 @@ Hi ha un camí C: **triar B i que algú d'aquí classifiqui els articles que fal
 novembre.** Us puc passar la llista exacta d'articles actius sense família perquè es reparteixi.
 
 **Aquesta és la que té data i la que m'amoïna.** Classificar 782 articles no és feina d'una tarda, no
-la puc fer jo, i queden set setmanes. Digue'm si li escric jo directament a l'Olga amb aquesta taula
-al davant o si ho porteu vosaltres — el que sigui més ràpid, però convindria decidir-ho aquesta
-setmana. Si arribem a mitjans d'octubre sense resposta, tiraré per l'opció A i ho parlem després,
-perquè és la que no deixa vuit de cada deu articles sense classificar.
+la puc fer jo, i queden set setmanes. Com que em deies que ho decideix el departament comercial,
+**li he escrit directament a l'Olga** amb aquestes xifres al davant i les tres opcions plantejades,
+per no perdre-hi una volta. T'hi poso en còpia si vols seguir-ho.
+
+El que sí que et demano és el criteri: si a mitjans d'octubre això no està decidit, l'opció C ja no
+hi cap i caldrà triar entre deixar vuit de cada deu articles sense família (B) o passar-vos 110
+famílies (A). **Quina de les dues et fa menys mal a l'aplicació?** Ho pregunto ara perquè, si arriba
+el cas, no vull haver-ho de decidir jo amb pressa.
 
 De propina, una cosa petita: a SAP conviuen `KM0` i `KM 0` —amb un espai— com si fossin dues famílies
 diferents. La segona té un sol article. Ho corregim aquí abans del tall.
@@ -192,8 +196,13 @@ ohijazo@agrienergia.com
 > - **La secció del dia 2** és nova. El `discount` es queda com està —`1-discount` a la seva SQL
 >   confirma que la convenció actual ja és la bona—, i del `/100` es demana confirmació per escrit
 >   perquè el runbook l'exigeix i és l'únic punt que falla en silenci.
-> - **Les famílies porten data i ultimàtum tou**: si a mitjans d'octubre no hi ha resposta de l'Olga,
->   opció A. Sense un límit, això no es decideix mai i els 782 articles no es classifiquen.
+> - **Les famílies**: s'escriu directament a l'Olga (`correu_olga_families.docx`, llest des del
+>   07/09) i a l'Adrià se li **diu**, no se li pregunta. Passar-ho per ell afegia una volta que amb 47
+>   dies no hi cap. A canvi se li demana el criteri per al pla B —si al final s'ha de triar entre A i
+>   B, quina li fa menys mal—, que és una cosa que ell sí que sap i nosaltres no.
+>
+> ⚠️ **Els dos correus s'han d'enviar el mateix dia, i el de l'Olga primer.** Si surt el de l'Adrià
+> dient «li he escrit» i el de l'Olga no ha sortit, queda malament i, pitjor, ningú no fa res.
 >
 > **Pendent de fer immediatament després d'enviar-lo:** passar-li la contrasenya d'`analitza_ro` per
 > un canal que no sigui el correu.
