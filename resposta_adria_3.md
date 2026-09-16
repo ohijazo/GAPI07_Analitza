@@ -13,21 +13,24 @@ Hola Adrià,
 Gràcies per la teva resposta. He pogut tancar tres coses, n'he trobat una que val la pena que
 miris, i sobretot: **ja tens accés**.
 
-## La connexió: el que ja t'he dit avui, per escrit
+## La connexió ja està oberta — i dues coses abans que la facis servir
 
-Per no repetir-m'hi, però perquè quedi al correu: Sistemes us van habilitar l'accés el **10 de
-setembre**, entreu per VPN com fèieu amb KAIS, i d'allà a `AE01SAPSQL`, port 1433, base de dades
-`IntercanviSAP`. Credencials de VPN i URL, les de sempre.
+Sistemes us van habilitar l'accés el **10 de setembre**. Entreu per VPN, igual que fèieu amb KAIS, i
+d'allà a `AE01SAPSQL`, port 1433, base de dades `IntercanviSAP`. Les credencials de la VPN i l'URL
+són les que ja teniu: aquí no ha canviat res.
 
-Les dues coses que t'he avançat avui:
+⚠️ **No carreguis res cap a producció encara.** Això apunta a la nostra SAP de **proves**, i a partir
+d'aquesta setmana les taules es refresquen cada nit: hi veuràs dades que semblen bones i no ho són.
+Són de l'entorn de test i et durien clients i imports que no existeixen — i amb codis que no són
+tots els de KAIS, o sigui que te'ls ingeriria com a **clients nous**. Per validar la connexió i el
+format, tot el que vulguis. El pas a la companyia real el faig jo el **2 de novembre** i t'aviso el
+mateix dia.
 
-- **La contrasenya d'`analitza_ro` va canviar el 31 d'agost** i els permisos es van acotar el mateix
-  dia (ara és `SELECT` només sobre les vuit taules `est_*`). La que tinguessis guardada no et
-  funcionarà, i el símptoma sembla un problema de xarxa. **Te la passo per un canal a part.**
-- **No carreguis res a producció encara.** Això apunta a la nostra SAP de **proves**, i des d'aquesta
-  nit les taules es refresquen cada dia: hi veuràs dades que semblen bones i no ho són. Per validar
-  connexió i format, tot el que vulguis. El pas a la companyia real el faig el 2 de novembre i
-  t'aviso el mateix dia.
+⚠️ **I el compte de SQL ha canviat.** El 31 d'agost vaig rotar la contrasenya d'`analitza_ro` i vaig
+acotar-li els permisos: ara és `SELECT` només sobre les vuit taules `est_*` (abans veia més coses de
+les que li tocaven). Si ho proves amb la que tenies guardada, el que veuràs és un error de login que
+**sembla un problema de xarxa**, i el diagnòstic se'n va cap a Sistemes durant dies. La contrasenya
+nova **te la passo per un canal a part**, no per correu.
 
 ## Fet: les adreces ja no es renumeren
 
@@ -200,10 +203,13 @@ ohijazo@agrienergia.com
 >   de la facturació passa pels 198 articles classificats, i dels 782 només 28 han facturat res. Es
 >   comunica la decisió en comptes de demanar-la. `correu_olga_families.md` queda **SUPERAT — NO
 >   ENVIAR**, i a l'Olga no se li escriu: no ha de decidir res.
-> - **La secció de la connexió s'ha escurçat**: l'avís de no carregar dades de test i el de la
->   contrasenya rotada es van enviar per separat el 16/09, quan es va veure que `dbo.est_*` es
->   refrescaria aquella mateixa nit per primer cop des del 24/08. Al correu hi queden com a
->   constància, no com a novetat.
+> ⚠️ **L'avís de no carregar dades de test encara NO li ha arribat, i el rellotge corre.** Des del
+> 16/09/2026 `dbo.est_*` es refresca cada nit amb dades de `DB_FARINERA_TEST`; abans es quedava
+> congelat al run 91 del 24/08 perquè el job avortava amb `ABORTED_STALE_MIRROR`. L'Adrià té accés
+> per VPN des del **10/09** i ningú li ha dit res. **Aquest correu és el que porta l'avís**: mentre no
+> surti, hi ha una finestra oberta en què pot ingerir dades de proves a la seva Analitza de producció
+> i donar d'alta clients que no existeixen. Si no es pot enviar avui, s'ha de dir per qualsevol altra
+> via.
 > - El codi de les famílies **ja està desplegat i validat** darrere de `cfg.settings.FAMILY_FROM_COMMERCIAL`,
 >   que és a `'0'`. Activar-lo fa desaparèixer 110 identificadors i vol `ID_DROP_MAX` apujat aquell
 >   dia. O sigui que el que es promet en aquest correu està fet, no previst.
