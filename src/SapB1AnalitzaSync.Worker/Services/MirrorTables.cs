@@ -104,6 +104,7 @@ internal static class MirrorTables
         dt.Columns.Add("validFor", typeof(string));
         dt.Columns.Add("frozenFor", typeof(string));
         dt.Columns.Add("SalUnitMsr", typeof(string));
+        dt.Columns.Add("U_SEIFamCialCat", typeof(string));
         dt.Columns.Add("U_SEISubFamCialCat", typeof(string));
         dt.Columns.Add("UpdateDate", typeof(DateTime));
         return dt;
@@ -116,6 +117,7 @@ internal static class MirrorTables
         SapEnums.YesNo(r.Valid),
         SapEnums.YesNo(r.Frozen),
         Val(r.SalesUnit),
+        Val(r.U_SEIFamCialCat),
         Val(r.U_SEISubFamCialCat),
         Val(r.UpdateDate));
 

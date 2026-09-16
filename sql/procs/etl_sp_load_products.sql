@@ -5,11 +5,34 @@
    Mapping:
      id_product            <- ItemCode                  varchar(16)
      name                  <- ItemName                  varchar(90)
-     product_categories_id <- ItmsGrpCod                varchar(250) — KAIS ho fa
-                              gran, respectem per idempotència
+     product_categories_id <- ItmsGrpCod o U_SEIFamCialCat, segons el flag de
+                              sota                      varchar(250) — KAIS ho
+                              fa gran, respectem per idempotència
      active                <- validFor='Y' AND frozenFor<>'Y'   bit
    Filtro: cap (per conservar històric — productes despublicats també).
    NO inclou available_from_date / available_to_date (KAIS no els té).
+
+   QUINA TAXONOMIA VA A ANALITZA
+   -----------------------------
+   cfg.settings.FAMILY_FROM_COMMERCIAL: '0' = els 110 grups d'article de SAP
+   (el que hi ha avui), '1' = la família comercial U_SEIFamCialCat, que són
+   les 12 que Analitza ja ensenya.
+
+   Mesurat el 16/09/2026 contra l'històric de vendes de KAIS (bi_estadili,
+   12 mesos, amb les mateixes sèries excloses que aplica Analitza): el
+   **98,53%** dels 22,26 M€ facturats passa pels 198 articles que SAP ja té
+   classificats. Els 782 "sense família" són recanvis, EPI's, palets i material
+   de fàbrica: només 28 han facturat res i 7 en fan el 90%.
+
+   Els articles sense família comercial surten amb product_categories_id = ''.
+   És a propòsit: cauen al mateix calaix de "sense assignació" que Analitza ja
+   té avui, que li val ~1,5% de la facturació. NO s'emet cap fila a
+   est_families_productes per a la cadena buida.
+
+   ⚠️ Canviar el flag fa desaparèixer 110 id_product_category de cop i
+   `vanished_ids` saltarà com a CRITICAL. És correcte: és un canvi massiu
+   previst, de la mateixa categoria que el cutover, i s'ha de fer
+   expressament apujant el llindar i tornant-lo a baixar l'endemà.
    ========================================================================= */
 USE IntercanviSAP;
 GO
@@ -28,6 +51,11 @@ BEGIN
     DECLARE @started datetime2(3) = SYSUTCDATETIME();
     DECLARE @rows_in bigint = 0, @rows_out bigint = 0;
 
+    /* Quina taxonomia va a Analitza. Veure el capçal. */
+    DECLARE @family_commercial bit = 0;
+    SELECT @family_commercial = ISNULL(TRY_CAST([value] AS bit), 0)
+    FROM   cfg.settings WHERE [key] = 'FAMILY_FROM_COMMERCIAL';
+
     BEGIN TRY
         TRUNCATE TABLE staging.est_productes;
 
@@ -35,7 +63,10 @@ BEGIN
             (id_product, [name], product_categories_id, active)
         SELECT  LEFT(ItemCode, 16),
                 LEFT(ISNULL(ItemName, ''), 90),
-                LEFT(CAST(ItmsGrpCod AS varchar(250)), 250),
+                CASE WHEN @family_commercial = 1
+                     THEN LEFT(ISNULL(RTRIM(LTRIM(U_SEIFamCialCat)), ''), 250)
+                     ELSE LEFT(CAST(ItmsGrpCod AS varchar(250)), 250)
+                END,
                 CASE WHEN validFor = 'Y' AND (frozenFor = 'N' OR frozenFor IS NULL)
                      THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
         FROM    sap_raw.OITM

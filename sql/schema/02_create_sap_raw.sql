@@ -115,7 +115,8 @@ CREATE TABLE sap_raw.OITM (
     validFor            char(1)       NULL,
     frozenFor           char(1)       NULL,
     SalUnitMsr          nvarchar(100) NULL,   -- SL SalesUnit ("GRA", "SAC", "UNI", "KG"...)
-    U_SEISubFamCialCat  nvarchar(254) NULL,   -- SUBFAMILIA
+    U_SEIFamCialCat     nvarchar(254) NULL,   -- FAMILIA comercial (les 12 d'Analitza)
+    U_SEISubFamCialCat  nvarchar(254) NULL,   -- SUBFAMILIA (les 20 d'Analitza)
     UpdateDate          datetime      NULL,
     _synced_at          datetime2(3)  NOT NULL CONSTRAINT DF_sap_raw_OITM_synced DEFAULT SYSUTCDATETIME(),
     CONSTRAINT PK_sap_raw_OITM PRIMARY KEY CLUSTERED (ItemCode)

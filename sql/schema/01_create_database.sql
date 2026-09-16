@@ -516,6 +516,19 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'DISCOUNT_AS_PERCENT_PUB
     INSERT cfg.settings ([key], [value], description)
     VALUES ('DISCOUNT_AS_PERCENT_PUBLISHED', '0', 'Amb quina convencio de discount es va publicar dbo.est_linies_albara per ultim cop. L escriu sp_swap_staging_to_prod dins de la transaccio del swap i NO es toca a ma: si no coincideix amb DISCOUNT_AS_PERCENT, sp_load_invoice_lines forca un FULL en comptes de copiar de dbo linies en l altra convencio.');
 
+/* Quina taxonomia de families va a Analitza.
+     '0' = els 110 grups d article de SAP (OITB)        -> el que hi ha avui
+     '1' = la familia comercial (OITM.U_SEIFamCialCat)  -> les ~12 que ells ja
+           ensenyen, i Analitza recomana no passar de 25
+   Mesurat el 16/09/2026 contra l historic de vendes de KAIS: el 98,53% de la
+   facturacio passa pels 198 articles que SAP ja te classificats. Els 782
+   "sense familia" son recanvis i consumibles que no es venen.
+   Posar-lo a '1' fa desapareixer 110 identificadors de cop: vanished_ids
+   saltara com a CRITICAL i s ha d apujar ID_DROP_MAX aquell dia. */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FAMILY_FROM_COMMERCIAL')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('FAMILY_FROM_COMMERCIAL', '0', 'Origen de est_families_productes i de est_productes.product_categories_id. 0 = els 110 grups d article d OITB (el que hi ha avui); 1 = la familia comercial OITM.U_SEIFamCialCat, les 12 que Analitza ensenya. Canviar-lo fa desapareixer 110 identificadors alhora, aixi que vol apujar ID_DROP_MAX el mateix dia i tornar-lo a baixar l endema.');
+
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('HISTORY_FLOOR_ENFORCE', '1', 'Atura el swap si la data mes antiga de staging.est_linies_albara es anterior a la de dbo. Analitza reemplaça el seu historic a partir de la data minima que li enviem, aixi que fer-la retrocedir els esborra dades. Nomes es posa a 0 per a un backfill volgut, i es torna a 1 tot seguit.');

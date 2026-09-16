@@ -136,3 +136,37 @@ GO
 IF COL_LENGTH('sap_raw.OCRD', 'U_FCNewCardCode') IS NOT NULL
     ALTER TABLE sap_raw.OCRD DROP COLUMN U_FCNewCardCode;
 GO
+
+/* -------------------------------------------------------------------------
+   2026-09-16 - sap_raw.OITM.U_SEIFamCialCat: hi entra
+
+   El camp de la FAMILIA comercial (les 12 que veu Analitza) ja es demanava al
+   $select i la sonda l'ensenyava, pero no s'escrivia enlloc: MirrorTables no
+   el portava i la taula del mirall no tenia la columna. O sigui que es baixava
+   de SAP i es llencava, i l'ETL no el podia fer servir encara que volgues.
+
+   Mesurat el 16/09/2026 contra KAIS (bi_estadili, ultims 12 mesos, amb les
+   mateixes series excloses que aplica Analitza): dels 22,26 MEUR facturats,
+   el 98,53% passa pels 198 articles que SAP ja te classificats. Els 782 que
+   surten "sense familia" son recanvis, EPI's, palets i material de fabrica
+   que no es venen: nomes 28 d'ells han facturat res, i 7 en fan el 90%.
+
+   La columna va aqui i no nomes a 02_create_sap_raw.sql perque alla el CREATE
+   no s'executa en una BD ja desplegada.
+   ------------------------------------------------------------------------- */
+IF COL_LENGTH('sap_raw.OITM', 'U_SEIFamCialCat') IS NULL
+    ALTER TABLE sap_raw.OITM ADD U_SEIFamCialCat nvarchar(254) NULL;
+GO
+
+/* -------------------------------------------------------------------------
+   2026-09-16 - cfg.settings.FAMILY_FROM_COMMERCIAL
+
+   El seed viu a 01_create_database.sql, que no s'executa en una BD ja
+   desplegada. Aqui perque hi arribi igualment, amb el mateix valor per
+   defecte: '0', o sigui cap canvi de comportament fins que algu el toqui
+   expressament.
+   ------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FAMILY_FROM_COMMERCIAL')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('FAMILY_FROM_COMMERCIAL', '0', 'Origen de est_families_productes i de est_productes.product_categories_id. 0 = els 110 grups d article d OITB (el que hi ha avui); 1 = la familia comercial OITM.U_SEIFamCialCat, les 12 que Analitza ensenya. Canviar-lo fa desapareixer 110 identificadors alhora, aixi que vol apujar ID_DROP_MAX el mateix dia i tornar-lo a baixar l endema.');
+GO
