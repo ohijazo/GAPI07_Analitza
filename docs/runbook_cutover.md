@@ -18,7 +18,8 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 | Depèn de | Què falta |
 |---|---|
-| **Adrià (Analitza)** | Les respostes del correu enviat el **31/08/2026** (`resposta_adria_2.docx`). Sense la del `/100`, el pas 2.4 no es pot escriure |
+| **Adrià (Analitza)** | El **«confirmat» per escrit del `/100`**, demanat a `resposta_adria_3.docx` (enviat el **16/09/2026**). És l'únic que queda d'ell i l'únic punt que falla en silenci; la resta del correu del 31/08 ja està contestada |
+| **Nosaltres — ara** | **Passar-li la contrasenya d'`analitza_ro` per un canal a part.** El correu del 16/09 l'hi promet |
 | **Nosaltres — abans del tall** | Activar `cfg.settings.FAMILY_FROM_COMMERCIAL` a `'1'` (les 12 famílies en comptes dels 110 grups). Codi desplegat i validat el 16/09/2026; el flag és a `'0'`. **Fa desaparèixer 110 identificadors alhora**, així que vol `ID_DROP_MAX` apujat aquell dia i baixat l'endemà. I omplir la família dels **vuit articles** de `docs/memoria_projecte.md` |
 | ~~**Sistemes**~~ | ✅ **Res pendent des del 16/09/2026.** Worker desplegat a `AE01SAPRDP`, tasca `GAPI07 Refresca sap_raw` a les 02:45 amb `sapsistema`, provada amb `LastTaskResult = 0` i `sync_state` refrescat. ~~Accés d'Analitza~~ ✅ **10/09/2026** — ja tenen VPN i `AE01SAPSQL:1433`, i les credencials de VPN són les de sempre |
 | **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |

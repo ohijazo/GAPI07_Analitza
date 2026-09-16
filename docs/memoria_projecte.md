@@ -1205,6 +1205,16 @@ Queda una sola cosa: **passar-li la contrasenya per un canal a part**.
 > tenia guardada, el símptoma és un login fallit que sembla un problema de xarxa, i el diagnòstic
 > se'n va cap a Sistemes durant dies. Avisar-los tots dos alhora.
 
+> ✅ **`resposta_adria_3.docx` enviat el 16/09/2026**, després de setze dies escrit sense sortir.
+> Porta l'avís que `IntercanviSAP` apunta a la SAP de proves i que no s'hi ha de carregar res cap a
+> producció —just el dia que `dbo.est_*` va començar a refrescar-se de debò—, l'avís que la
+> contrasenya d'`analitza_ro` va canviar el 31/08, la decisió de mantenir les seves 12 famílies amb
+> els números al davant, i una sola pregunta de tornada: **el «confirmat» per escrit del `/100`**.
+>
+> **Pendent immediat nostre: passar-li la contrasenya d'`analitza_ro` per un canal a part.** I si
+> contesta llarg sobre famílies i se salta el `/100`, repreguntar-ho sol: és l'únic punt del projecte
+> que falla en silenci.
+
 **Bloc C — Pendent amb l'Adrià.** Revisat contra els seus correus del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`), tres dels pendents ja tenen resposta o camí:
 

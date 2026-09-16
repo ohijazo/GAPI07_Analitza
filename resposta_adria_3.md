@@ -203,13 +203,13 @@ ohijazo@agrienergia.com
 >   de la facturació passa pels 198 articles classificats, i dels 782 només 28 han facturat res. Es
 >   comunica la decisió en comptes de demanar-la. `correu_olga_families.md` queda **SUPERAT — NO
 >   ENVIAR**, i a l'Olga no se li escriu: no ha de decidir res.
-> ⚠️ **L'avís de no carregar dades de test encara NO li ha arribat, i el rellotge corre.** Des del
-> 16/09/2026 `dbo.est_*` es refresca cada nit amb dades de `DB_FARINERA_TEST`; abans es quedava
-> congelat al run 91 del 24/08 perquè el job avortava amb `ABORTED_STALE_MIRROR`. L'Adrià té accés
-> per VPN des del **10/09** i ningú li ha dit res. **Aquest correu és el que porta l'avís**: mentre no
-> surti, hi ha una finestra oberta en què pot ingerir dades de proves a la seva Analitza de producció
-> i donar d'alta clients que no existeixen. Si no es pot enviar avui, s'ha de dir per qualsevol altra
-> via.
+> ✅ **ENVIAT el 16/09/2026**, el mateix dia que `dbo.est_*` va començar a refrescar-se amb dades de
+> `DB_FARINERA_TEST`. Abans es quedava congelat al run 91 del 24/08 perquè el job avortava amb
+> `ABORTED_STALE_MIRROR`, així que la finestra en què l'Adrià podia ingerir dades de proves sense
+> saber-ho va durar hores, no dies. Tenia accés per VPN des del 10/09.
+>
+> **El que queda immediatament: passar-li la contrasenya d'`analitza_ro` per un canal a part.** El
+> correu l'hi promet; avisat i sense credencial queda igual de bloquejat.
 > - El codi de les famílies **ja està desplegat i validat** darrere de `cfg.settings.FAMILY_FROM_COMMERCIAL`,
 >   que és a `'0'`. Activar-lo fa desaparèixer 110 identificadors i vol `ID_DROP_MAX` apujat aquell
 >   dia. O sigui que el que es promet en aquest correu està fet, no previst.
