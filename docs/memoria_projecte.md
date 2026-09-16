@@ -231,15 +231,16 @@ notava perquè no havia canviat res.
 **Bloquejat**: no tenim accés a `AE01SAPRDP`. Fins llavors el job de les 03:00 avortarà amb
 `ABORTED_STALE_MIRROR`, que és el comportament correcte: no publica res.
 
-**Demanat a Sistemes el 07/09/2026** i el fil segueix viu; l'estat, a §9, *El fil amb Sistemes*. A
-16/09/2026 encara no hi ha ni compte de servei, ni carpeta, ni tasca: `C:\Apps\SapB1AnalitzaSync`
-**no existeix** a `AE01SAPRDP`.
+**Demanat a Sistemes el 07/09/2026.** El **16/09/2026**, per Teams, es va desbloquejar en una tarda
+el que tres correus no havien mogut: la carpeta ja existeix i el compte de servei també. El detall,
+a §9, *El fil amb Sistemes*. El que encara falta és **l'accés d'`ohijazo` a la màquina** (RDP i
+permís NTFS a la carpeta) i la tasca, que registren ells.
 
 **Quatre comptes diferents, i els crea gent diferent:**
 
 | Compte | Per a què | Qui |
 |---|---|---|
-| Windows (`AGRIENERGIA\svc_gapi07`) | Executar la tasca a `AE01SAPRDP` | Sistemes |
+| Windows (`AGRIENERGIA\sapsistemes`) | Executar la tasca a `AE01SAPRDP`. ✅ **Ja existeix** (16/09/2026). El nom `svc_gapi07` que surt als correus del 07 i 10/09 era la nostra proposta, no el compte real | Sistemes |
 | SAP Service Layer (`GAPI07_RO`) | Llegir SAP. Ara va amb `OHijazo`, nominal | Oscar |
 | SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. En local encara va amb `sa` | Oscar — `sql/security/Create-WorkerUser.ps1` |
 | SQL Server (`gapi07_etl`) | Context del pas del job. **Sense login**: no s'hi connecta ningú, només s'impersona | Oscar — `sql/security/create_etl_user.sql`, 31/08/2026 |
@@ -922,9 +923,10 @@ El que sí que val del blueprint és el capítol 17, de dalt.
 
 ### Del projecte, anteriors a la migració
 
-**Bloc A — Sistemes:** desplegament del Worker a `AE01SAPRDP` (compte de servei, carpeta i tasca de
-les 02:45); freqüència i retenció del backup d'`AE01SAPSQL`; compte SMTP per a Database Mail.
-~~Accés d'Analitza a `AE01SAPSQL`~~ ✅ concedit el 10/09/2026. Són feina d'infraestructura, no de SAP.
+**Bloc A — Sistemes:** desplegament del Worker a `AE01SAPRDP` (~~compte de servei~~ ✅ i ~~carpeta~~ ✅
+el 16/09/2026; queden **l'accés d'`ohijazo` a la màquina** i la tasca de les 02:45); freqüència i
+retenció del backup d'`AE01SAPSQL`; compte SMTP per a Database Mail. ~~Accés d'Analitza a
+`AE01SAPSQL`~~ ✅ concedit el 10/09/2026. Són feina d'infraestructura, no de SAP.
 
 > ⚠️ **No és obrir el port 1433 a les IP públiques d'Analitza.** Ho vam entendre malament durant
 > mesos. La resposta de Sistemes del **15/06/2026** ho diu: *«Perquè Analitza pugui accedir el
@@ -945,6 +947,10 @@ les 02:45); freqüència i retenció del backup d'`AE01SAPSQL`; compte SMTP per 
 
 #### El fil amb Sistemes (07/09 → 16/09/2026)
 
+> **A 16/09/2026 el punt 8 ha deixat de ser un mur.** Hi ha carpeta, hi ha compte de servei
+> (`sapsistemes`) i hi ha acord de qui registra la tasca. Falta que `ohijazo` pugui entrar a la
+> màquina. Tot això va passar **per Teams la tarda del 16**, després d'enviar el correu del matí.
+
 | Data | Qui | Què |
 |---|---|---|
 | 15/06/2026 | Sistemes | Contesten set punts. Concedeixen l'accés d'Analitza («només m'ho heu de dir»). En queden dos pendents **d'informació nostra** |
@@ -953,11 +959,19 @@ les 02:45); freqüència i retenció del backup d'`AE01SAPSQL`; compte SMTP per 
 | 10/09/2026 | Nosaltres | `resposta_sistemes_2026-09-10.md`: es concreta el 3, el 6 i el 8, i es torna a fer la pregunta del refresc de `DB_FARINERA_TEST`, que mai no els va arribar |
 | 16/09/2026 | Sistemes | Del punt 8: *«aquesta carpeta `C:\Apps\SapB1AnalitzaSync` és a `AE01SAPRDP` o `AE01SAPSQL`? la tinc de crear o ja està creada?»* |
 | 16/09/2026 | Nosaltres | `resposta_sistemes_2026-09-16.md`: `AE01SAPRDP`, i s'ha de crear |
+| 16/09/2026 | Nosaltres | **Per Teams**, versió curta del mateix correu: on va, qui crea la carpeta, els permisos, i que qui executa la tasca no ha de ser `ohijazo` |
+| 16/09/2026 | Sistemes | *«amb l'usuari d'execució de la tasca, has de poder-la crear? o la vols crear amb el teu usuari i que l'executi l'altre usuari?»* |
+| 16/09/2026 | Nosaltres | Cap de les dues: **que la registrin ells**. Veure *Qui registra la tasca* |
+| 16/09/2026 | Sistemes | *«ok, si la creo jo ja ho tinc fet. La crearé amb admin i l'encarregat d'executar serà l'altre usuari, que es diu `sapsistemes`»* |
+| 16/09/2026 | Sistemes | Carpeta creada. *«té permís aquest usuari, els administradors locals i l'administrador de domini»* |
+| 16/09/2026 | Nosaltres | L'ACL és la correcta, però `ohijazo` no hi és: cal permís de modificació **i** poder entrar a la màquina |
+| 16/09/2026 | Sistemes | *«s'ha de poder veure aquesta carpeta? des de qualsevol pc? si fas `\\ae01saprdp\` ho has de poder veure?»* |
+| 16/09/2026 | Nosaltres | **No**, cap recurs compartit. El que cal és RDP + NTFS |
 
-**La resposta, per no tornar-la a buscar:** la carpeta va a **`AE01SAPRDP`** (192.168.11.239) i **no
-existeix**. A `AE01SAPSQL` no hi va res de nou —ja hi corre el job de les 03:00 i a partir del
+**La resposta del matí, per no tornar-la a buscar:** la carpeta va a **`AE01SAPRDP`**
+(192.168.11.239). A `AE01SAPSQL` no hi va res de nou —ja hi corre el job de les 03:00 i a partir del
 cutover és la màquina més crítica que tenim— i la carpeta buida la creen ells, perquè va lligada als
-permisos, que són seus. El contingut l'hi posem nosaltres.
+permisos, que són seus. El contingut l'hi posem nosaltres. **La van crear el mateix dia.**
 
 **Que ho preguntin vol dir que l'annex del 07/09 no l'han relacionat amb el cos del correu**: la
 carpeta destí i l'origen dels fitxers hi consten en una taula. Per això la resposta del 16/09
@@ -966,17 +980,80 @@ respecte del 10/09, a propòsit: si cada correu canvia la frontera, es torna a d
 L'única cosa que s'hi ha afegit és qui crea la carpeta buida, que anava sobreentesa dins de «donar-me
 accés a `C:\Apps\SapB1AnalitzaSync`» — i la pregunta demostra que sobreentesa no estava.
 
-⚠️ **El compte de servei ja va per la tercera vegada.** El 07/09 no el van contestar, el 10/09 van
-entendre l'accés per a `ohijazo` i no el compte, i el 16/09 tampoc hi apareix. Si es deixa passar, la
-tasca acabarà corrent amb un usuari nominal, que és exactament el problema que ja tenim viu amb
-`OHijazo` a Service Layer. **Si a la resposta següent torna a no aparèixer `svc_gapi07` o
-equivalent, demanar-ho en un correu a part i com a línia única**, no dins d'una llista: dins d'una
-llista ja s'ha perdut tres vegades.
+✅ **El compte de servei existeix i es diu `sapsistemes`** (16/09/2026). Portava tres intents: el
+07/09 no el van contestar, el 10/09 van entendre només l'accés per a `ohijazo`, i el correu del
+16/09 tampoc l'esmentava. El que el va desencallar no va ser insistir-hi, sinó **el paràgraf que
+explicava la conseqüència**: que si la tasca corre amb un usuari nominal, el dia que canviï la
+contrasenya o no hi sigui, la integració s'atura sense que ningú sàpiga per què. Val la pena
+recordar-ho per a la resta de peticions obertes: el «per què» els mou més que el «què».
 
-De la resposta del 16/09 val la pena conservar-ne una comprovació: **`Test-Path
-C:\Apps\SapB1AnalitzaSync` ha de dir `False`**. Si digués `True`, hi ha alguna cosa que no hi hem
-posat nosaltres, i `AE01SAPRDP` allotja webservices de tercers: val més saber-ho abans de copiar-hi
-81 MB i tancar-hi els permisos NTFS a sobre.
+`svc_gapi07` era **la nostra proposta de nom**, no un compte real, i als correus del 07 i del 10/09
+hi surt com si ho fos. El compte real és `sapsistemes`, i és seu.
+
+⚠️ **`sapsistemes` no és un compte creat per a això.** El nom fa pensar que ja el feien servir per a
+altres tasques de SAP en aquella màquina. Això no és un problema de seguretat greu —són tasques
+seves, no de tercers— però té dues conseqüències: el fitxer de configuració amb les credencials de
+SAP i de SQL serà llegible per tot el que corri amb aquell compte, i **si algun dia li roten la
+contrasenya, la tasca s'atura silenciosament** i des de fora només es veurà que Analitza es queda
+amb les dades d'ahir. Està demanat que ens ho avisin. Pendent de confirmar si és administrador
+local: a l'ACL de la carpeta el llisten **a part** dels administradors, o sigui que probablement no.
+
+##### Qui registra la tasca, i per què ells
+
+La pregunta del 16/09 —*«has de poder-la crear amb l'usuari d'execució, o crear-la tu i que
+l'executi l'altre?»*— parteix d'una premissa falsa que convé tenir clara:
+
+> **Qui crea la tasca i qui l'executa són coses independents.** La tasca guarda el seu *principal* a
+> dins; un cop registrada, qui la va donar d'alta és irrellevant.
+
+Així que l'única decisió real és qui la dona d'alta, i les dues opcions no són simètriques:
+
+| | Què cal | Conseqüència |
+|---|---|---|
+| **La registren ells** ✅ | Res de nou: teclegen la contrasenya de `sapsistemes` al `Register-ScheduledTask` | La contrasenya no surt mai de Sistemes |
+| La registrem nosaltres | **Admin local a `AE01SAPRDP`** + que ens passin la contrasenya de `sapsistemes` | Les dues coses que portem tres correus dient que no volem |
+
+`Register-ScheduledTask -User <un altre compte> -Password ...` **demana drets d'administrador**. Fer-ho
+nosaltres significaria tenir admin en una màquina amb webservices de tercers i el secret del compte
+de servei a les mans — el mateix patró que ja tenim mal resolt amb `OHijazo` a Service Layer.
+
+Acordat el 16/09: **la registren ells, amb admin, i corre amb `sapsistemes`**.
+
+##### La carpeta: l'ACL és correcta, i no es comparteix
+
+`C:\Apps\SapB1AnalitzaSync` existeix des del 16/09/2026, amb permís per a **`sapsistemes`, els
+administradors locals i l'administrador de domini**. Ni `Users` ni `Everyone`: és exactament l'ACL
+que volíem, així que **l'`icacls` de tancament que teníem previst ja no cal**. Val la pena
+verificar-ho igualment en entrar-hi, per si hi ha herència de `C:\Apps` que no es vegi a la seva
+llista.
+
+Hi falta `ohijazo`, i això és el que bloqueja ara: sense permís de modificació no s'hi poden copiar
+els fitxers ni escriure-hi la configuració.
+
+⚠️ **La carpeta no s'ha de compartir.** Van preguntar si havia de ser visible des de
+`\\ae01saprdp\`. **No**, i el motiu és el mateix pel qual la configuració no va a variables d'entorn
+de màquina: a dins hi haurà un fitxer amb credencials de SAP i de SQL, en un servidor que allotja
+webservices de col·laboradors externs. El que cal no és veure la carpeta des de fora, és **entrar a
+la màquina** (RDP) amb `ohijazo` i estirar els fitxers des de `\\tomatera\...` des de dins.
+
+Corol·lari que convé dir abans que el proposin ells: **els binaris sí que els poden copiar ells, però
+la configuració no.** `appsettings.Production.json` porta credencials i s'ha d'escriure a la màquina;
+no viatja per Teams, ni per correu, ni per cap carpeta compartida.
+
+##### L'ordre importa: la tasca es registra l'última
+
+Primer la carpeta i el compte, després els fitxers i la configuració, i **llavors** la tasca. Si es
+registra abans, cada nit a les 02:45 falla amb *file not found* i genera soroll d'alertes per no res
+en una màquina que no és nostra. Demanat que **la creïn desactivada** i que l'activin quan avisem —
+que és també el moment de llançar-la un cop a mà, l'única manera de comprovar que `sapsistemes`
+arriba a `AE01SAPSQL` i pot escriure a `sap_raw`.
+
+Executar `SapB1AnalitzaSync.Worker.exe --once` a mà des de la sessió d'`ohijazo` **no substitueix
+aquesta prova**: correria amb un altre compte i no validaria justament el que s'ha de validar.
+
+La part de SQL no canvia i val la pena no confondre-la: el Worker es connecta amb `gapi07_worker`
+(**autenticació SQL**, a l'`appsettings`), no amb el compte de Windows. `sapsistemes` no s'ha de
+donar d'alta enlloc de SQL Server; només executa el procés.
 
 **El que continua obert amb ells:**
 
@@ -985,8 +1062,13 @@ posat nosaltres, i `AE01SAPRDP` allotja webservices de tercers: val més saber-h
 | 3 | Freqüència i retenció del backup d'`AE01SAPSQL` | **Segona vegada sense contestar.** Si a la tercera tampoc arriba, configurar el FULL diari pel nostre compte i informar-los |
 | 3 | On van els fitxers del FULL diari d'`IntercanviSAP` | Obert |
 | 6 | ¿Hi ha relay SMTP intern? | Obert. Si el 30/09 no hi ha resposta, muntar l'opció 3 (compte propi amb App Password) sense esperar-los |
-| 8 | Compte de servei + *Log on as a batch job* + accés a la carpeta | Obert, i és el que bloqueja la resta |
-| 8 | Registre de la tasca de les 02:45 (o el permís perquè la registrem nosaltres) | Obert. Està a la seva columna perquè registrar una tasca que corre amb un altre compte demana drets d'administrador |
+| 8 | ~~Compte de servei~~ | ✅ **16/09/2026**: `AGRIENERGIA\sapsistemes` |
+| 8 | ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ | ✅ **16/09/2026**, amb l'ACL correcta |
+| 8 | **Accés d'`ohijazo` a `AE01SAPRDP`: RDP + modificació sobre la carpeta** | Obert, i **ara és això el que bloqueja**. Sense les dues coses no s'hi poden posar ni els fitxers ni la configuració |
+| 8 | *Log on as a batch job* per a `sapsistemes` | Obert. Si falta, la tasca es registra igual i falla cada nit amb `0x4` |
+| 8 | Registre de la tasca de les 02:45 | Acordat que la fan ells, amb admin i amb `sapsistemes`. **Demanat que la creïn desactivada** i que l'activin quan els fitxers hi siguin |
+| 8 | Poder llançar la tasca un cop per provar-la | Obert. N'hi ha prou que la llancin ells i ens diguin el resultat |
+| 8 | ¿`sapsistemes` és admin i es comparteix amb altres tasques? | Obert. No canvia el disseny; canvia qui pot llegir el fitxer de configuració |
 | — | Qui refresca `DB_FARINERA_TEST`, ells o Seidor | Obert. La pregunta és del 07/09 però no els va arribar fins al 10/09 |
 
 **Bloc B — Handoff.** ✅ Contrasenya d'`analitza_ro` rotada el 31/08/2026 i el compte acotat al

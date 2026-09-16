@@ -6,6 +6,27 @@ El Worker corre com a **tasca programada** al servidor d'aplicacions
 **AE01SAPRDP allotja webservices de col·laboradors externs.** Això condiciona com s'hi posen les
 credencials: res de variables d'entorn de màquina, que qualsevol procés de la màquina pot llegir.
 
+## Qui fa què (acordat amb Sistemes el 16/09/2026)
+
+La màquina no és nostra i no hi som administradors. El repartiment és aquest, i explica per què
+alguns passos d'aquest document ja no els executem nosaltres:
+
+| Sistemes | Nosaltres |
+|---|---|
+| ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ ✅ feta el 16/09/2026 | Copiar-hi els binaris |
+| ~~Crear el compte de servei~~ ✅ `AGRIENERGIA\sapsistemes` | Escriure-hi `appsettings.Production.json` |
+| Donar-li *Log on as a batch job* | Provar la cadena de punta a punta |
+| Donar accés a la carpeta a `sapsistemes` **i** a `ohijazo`, i RDP a `ohijazo` | |
+| **Registrar la tasca** (punt 4), amb admin i amb `sapsistemes` | |
+
+**Registrar la tasca és seu i no es negocia**: `Register-ScheduledTask -User <un altre compte>` demana
+drets d'administrador local, i fer-ho nosaltres voldria dir tenir admin en aquella màquina i la
+contrasenya de `sapsistemes` a les mans. Qui **crea** la tasca i qui la **executa** són coses
+independents — la tasca es guarda el seu principal a dins—, així que no en perdem res.
+
+⚠️ **La carpeta no s'ha de compartir per xarxa.** Ni `\\ae01saprdp\...` ni cap altre recurs: hi ha un
+fitxer amb credencials de SAP i de SQL. S'hi entra per RDP i els fitxers s'estiren des de dins.
+
 ---
 
 ## Per què no és un pas del job de SQL Agent
@@ -25,12 +46,16 @@ hores i que les transformacions d'aquell matí anaven sobre dades del dia anteri
 
 ## 1. Copiar els binaris
 
-Des de `AE01SAPRDP`, en PowerShell **elevada**:
+Des d'una sessió de RDP a `AE01SAPRDP`, amb `ohijazo`. **La carpeta ja existeix** (la va crear
+Sistemes el 16/09/2026), així que no cal crear-la ni cal PowerShell elevada — només permís de
+modificació sobre la carpeta:
 
 ```powershell
-New-Item -ItemType Directory -Force C:\Apps\SapB1AnalitzaSync
 Copy-Item "\\tomatera\Farinera\ohijazo\GAPI07_Analitza\publish\*" C:\Apps\SapB1AnalitzaSync -Recurse -Force
 ```
+
+Els 81 MB s'estiren **des de dins de la màquina**: `\\tomatera` és accessible des d'allà i així no
+cal compartir la carpeta destí.
 
 La publicació és **autocontinguda**: no cal instal·lar el runtime de .NET 8 al servidor.
 
@@ -42,13 +67,26 @@ dotnet publish P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -c Release -r win
 
 ## 2. El compte que executa la tasca
 
-Cal un compte dedicat, no el teu. Ha de poder:
+És **`AGRIENERGIA\sapsistemes`**, el compte que va donar Sistemes el 16/09/2026. No és el teu, que
+era el requisit; sí que sembla que el comparteixen amb altres tasques seves de SAP en aquella
+màquina.
+
+Ha de poder:
 
 - Sortir a `192.168.11.238:50000` (Service Layer, HTTPS)
-- Sortir a `192.168.11.238:1433` (SQL Server) i **escriure a `IntercanviSAP.sap_raw`**
-- Tenir el dret *Log on as a batch job* a `AE01SAPRDP`
+- Sortir a `192.168.11.238:1433` (SQL Server)
+- Tenir el dret *Log on as a batch job* a `AE01SAPRDP` — **sense això la tasca es registra igual i
+  falla cada nit amb `0x4`**
 
 No li cal ser administrador ni tocar res més de la màquina.
+
+**No s'ha de donar d'alta a SQL Server.** El Worker s'hi connecta amb `gapi07_worker`
+(autenticació SQL, dins de l'`appsettings`); el compte de Windows només executa el procés. És una
+confusió fàcil i val la pena aturar-la abans que algú creï un login que no cal.
+
+⚠️ Com que el compte és de Sistemes, **si li roten la contrasenya la tasca s'atura silenciosament**:
+des de fora només es veurà que Analitza es queda amb les dades d'ahir. Està demanat que ens ho
+avisin; si el símptoma apareix sense cap altra explicació, aquesta és la primera hipòtesi.
 
 ## 3. La configuració, i per què no va a variables d'entorn
 
@@ -76,22 +114,37 @@ Crea `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json`:
 `AllowInvalidCertificates` a `true` perquè el certificat del Service Layer és autofirmat. Si algun
 dia se'n posa un de vàlid, cal treure-ho.
 
-I tanca la carpeta: **només el compte de la tasca i els administradors**.
+La carpeta ha de quedar llegible **només pel compte de la tasca i pels administradors**. Sistemes la
+van crear el 16/09/2026 ja amb aquesta ACL —`sapsistemes`, administradors locals i administrador de
+domini—, o sigui que **normalment no cal tancar res**: només verificar-ho.
+
+```powershell
+icacls C:\Apps\SapB1AnalitzaSync
+```
+
+No hi ha d'aparèixer `Users` ni `Everyone`. Si hi surten (herència de `C:\Apps` que no es veiés des
+de la seva banda), cal demanar-los que ho arreglin — `/inheritance:r` demana ser-ne propietari o
+administrador:
 
 ```powershell
 icacls C:\Apps\SapB1AnalitzaSync /inheritance:r
-icacls C:\Apps\SapB1AnalitzaSync /grant:r "DOMINI\compte-tasca:(OI)(CI)(RX)"
+icacls C:\Apps\SapB1AnalitzaSync /grant:r "AGRIENERGIA\sapsistemes:(OI)(CI)(RX)"
 icacls C:\Apps\SapB1AnalitzaSync /grant:r "Administrators:(OI)(CI)(F)"
 icacls C:\Apps\SapB1AnalitzaSync /grant:r "SYSTEM:(OI)(CI)(F)"
 ```
 
-Comprova-ho després amb `icacls C:\Apps\SapB1AnalitzaSync`: no hi ha d'aparèixer `Users` ni
-`Everyone`.
+## 4. La tasca programada — **la registra Sistemes**
 
-## 4. La tasca programada
+Queda aquí per si l'han de tornar a fer, i perquè les comandes exactes són les que se'ls van passar
+a l'annex del correu del 07/09/2026. **No l'executem nosaltres**: demana admin local.
+
+**Es registra l'última**, quan els binaris i l'`appsettings.Production.json` ja hi són. Si es dona
+d'alta abans, cada nit a les 02:45 falla amb *file not found* i genera soroll d'alertes en una
+màquina que no és nostra. Per això se'ls va demanar que **la creïn desactivada** i l'activin quan
+avisem.
 
 ```powershell
-$acc = "DOMINI\compte-tasca"
+$acc = "AGRIENERGIA\sapsistemes"
 $act = New-ScheduledTaskAction -Execute "C:\Apps\SapB1AnalitzaSync\SapB1AnalitzaSync.Worker.exe" `
                                -Argument "--once" `
                                -WorkingDirectory "C:\Apps\SapB1AnalitzaSync"
@@ -105,6 +158,12 @@ Register-ScheduledTask -TaskName "GAPI07 Refresca sap_raw" `
 ```
 
 ## 5. Provar-la
+
+⚠️ **Llançar `SapB1AnalitzaSync.Worker.exe --once` a mà des de la sessió d'`ohijazo` no substitueix
+aquesta prova.** Correria amb un altre compte, i el que s'ha de validar és justament que
+`sapsistemes` arriba a `AE01SAPSQL` pels dos ports i pot escriure a `sap_raw`. Cal llançar **la
+tasca**: o ho fem nosaltres si ens donen permís sobre aquella tasca, o la llancen ells i ens diuen el
+`LastTaskResult`.
 
 ```powershell
 Start-ScheduledTask -TaskName "GAPI07 Refresca sap_raw"
