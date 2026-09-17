@@ -116,18 +116,24 @@ EXEC msdb.dbo.sp_send_dbmail
     @body         = N'Si reps aquest correu, Database Mail esta configurat correctament.';
 GO
 
-/* ---------- 9. Comprovar l'estat del test ---------- */
+/* ---------- 9. Comprovar l'estat del test ----------
+   Nomes l'ultima hora. Sense el filtre de data, aixo aboca tot l'historic de
+   fallades del servidor -aqui n'hi havia de l'abril, del compte anterior- i
+   el que veus es una paret vermella que sembla que el test hagi fallat quan
+   ha anat be. Va passar el 17/09/2026. */
 WAITFOR DELAY '00:00:10';
 
 SELECT TOP 3 sent_status, sent_date, recipients, subject
 FROM   msdb.dbo.sysmail_allitems
+WHERE  sent_date > DATEADD(HOUR, -1, GETDATE())
 ORDER  BY mailitem_id DESC;
 
-/* Si hi ha cap fila amb sent_status='failed', el motiu es aqui. Un error 535
+/* Si el de dalt surt buit o amb sent_status='failed', el motiu es aqui. Un 535
    vol dir credencial rebutjada: mirar si SMTP AUTH esta habilitat al mailbox
    abans de sospitar de la contrasenya. */
-SELECT TOP 5 log_date, event_type, [description]
+SELECT TOP 5 log_date, event_type, LEFT([description], 300) AS descripcio
 FROM   msdb.dbo.sysmail_event_log
 WHERE  event_type IN ('error','warning')
+  AND  log_date > DATEADD(HOUR, -1, GETDATE())
 ORDER  BY log_id DESC;
 GO

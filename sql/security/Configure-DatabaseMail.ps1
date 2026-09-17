@@ -93,10 +93,15 @@ finally {
 }
 
 Write-Host ""
+Write-Host "COM LLEGIR EL QUE ACABES DE VEURE:" -ForegroundColor Yellow
+Write-Host "  Les consultes finals nomes miren l'ultima hora. Si hi surt una" -ForegroundColor Yellow
+Write-Host "  linia amb sent_status=sent, ha anat be; qualsevol cosa mes vella" -ForegroundColor Yellow
+Write-Host "  no te res a veure amb aquesta execucio." -ForegroundColor Yellow
+Write-Host ""
 Write-Host "QUE FALTA:" -ForegroundColor Yellow
 Write-Host "  1. Reiniciar el SQL Agent a la maquina perque llegeixi els" -ForegroundColor Yellow
 Write-Host "     registres nous. Sense aixo, el job no enviara res encara que" -ForegroundColor Yellow
-Write-Host "     el test hagi arribat." -ForegroundColor Yellow
+Write-Host "     el test hagi arribat: es la confusio mes facil d'aquest pas." -ForegroundColor Yellow
 Write-Host "  2. Mirar la bustia: el test ha d'arribar en menys d'un minut." -ForegroundColor Yellow
 Write-Host "  3. Si surt sent_status=failed amb un 535, el problema es que SMTP" -ForegroundColor Yellow
 Write-Host "     AUTH no esta habilitat al mailbox, no la contrasenya." -ForegroundColor Yellow
