@@ -1276,7 +1276,7 @@ donar d'alta enlloc de SQL Server; només executa el procés.
 |---|---|---|
 | 3 | Freqüència i retenció del backup d'`AE01SAPSQL` | **Segona vegada sense contestar.** Si a la tercera tampoc arriba, configurar el FULL diari pel nostre compte i informar-los |
 | 3 | On van els fitxers del FULL diari d'`IntercanviSAP` | Obert |
-| 6 | ¿Hi ha relay SMTP intern? | Obert. Si el 30/09 no hi ha resposta, muntar l'opció 3 (compte propi amb App Password) sense esperar-los |
+| 6 | ~~Compte SMTP per a Database Mail~~ | ✅ **17/09/2026**: van crear `sql-alerts@agrienergia.com`, que era **l'opció 1** de les tres —un mailbox institucional, no el compte de ningú. Configurat i provat el mateix dia |
 | 8 | ~~Compte de servei~~ | ✅ **16/09/2026**: `AGRIENERGIA\sapsistema` |
 | 8 | ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ | ✅ **16/09/2026**, amb l'ACL correcta |
 | 8 | ~~Accés d'`ohijazo` a `AE01SAPRDP`~~ | ✅ **16/09/2026**: RDP concedit (primer intent: `0x3`/`0x9`, que és *no autoritzat per a inici de sessió remot*, no xarxa) i `(OI)(CI)(F)` sobre la carpeta |
