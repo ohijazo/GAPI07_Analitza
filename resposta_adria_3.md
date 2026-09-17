@@ -208,14 +208,14 @@ ohijazo@agrienergia.com
 > `ABORTED_STALE_MIRROR`, així que la finestra en què l'Adrià podia ingerir dades de proves sense
 > saber-ho va durar hores, no dies. Tenia accés per VPN des del 10/09.
 >
-> **El que queda immediatament: passar-li la contrasenya d'`analitza_ro` per un canal a part.** El
-> correu l'hi promet; avisat i sense credencial queda igual de bloquejat.
+> ✅ **Contrasenya d'`analitza_ro` passada el mateix dia** per un canal a part. Amb això el handoff
+> queda tancat: té ruta, credencial i dades. D'ell només falta el «confirmat» del `/100`.
 > - El codi de les famílies **ja està desplegat i validat** darrere de `cfg.settings.FAMILY_FROM_COMMERCIAL`,
 >   que és a `'0'`. Activar-lo fa desaparèixer 110 identificadors i vol `ID_DROP_MAX` apujat aquell
 >   dia. O sigui que el que es promet en aquest correu està fet, no previst.
 >
-> **Pendent de fer immediatament després d'enviar-lo:** passar-li la contrasenya d'`analitza_ro` per
-> un canal que no sigui el correu.
+> ✅ **Fet:** la contrasenya d'`analitza_ro` es va passar el 16/09/2026 per un canal que no és el
+> correu.
 >
 > **Fet i commitejat l'01/09/2026:**
 > - `cfg.client_ship_no` + `etl.sp_assign_client_ship_no`; `etl.vw_client_ship` passa a llegir el

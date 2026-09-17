@@ -1241,7 +1241,9 @@ contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). ✅ **Sist
 l'accés el 10/09/2026**: Analitza ja entra per VPN a `AE01SAPSQL:1433`, i no calia enviar-los cap
 endpoint perquè les credencials de VPN són les que ja tenien.
 
-Queda una sola cosa: **passar-li la contrasenya per un canal a part**.
+✅ **Contrasenya passada el 16/09/2026** per un canal a part. **El Bloc B queda tancat**: Analitza té
+ruta, credencial i dades. Va costar de maig a setembre i el que el va resoldre no va ser una obertura
+de firewall —que mai no va caldre— sinó demanar l'activació i adonar-se que entraven per VPN.
 
 > ⚠️ Sistemes ho van comunicar com «les credencials i l'url són les mateixes, no ha canviat res».
 > Per la VPN és cert; **pel login de SQL no**. La contrasenya d'`analitza_ro` es va rotar el
@@ -1255,9 +1257,9 @@ Queda una sola cosa: **passar-li la contrasenya per un canal a part**.
 > contrasenya d'`analitza_ro` va canviar el 31/08, la decisió de mantenir les seves 12 famílies amb
 > els números al davant, i una sola pregunta de tornada: **el «confirmat» per escrit del `/100`**.
 >
-> **Pendent immediat nostre: passar-li la contrasenya d'`analitza_ro` per un canal a part.** I si
-> contesta llarg sobre famílies i se salta el `/100`, repreguntar-ho sol: és l'únic punt del projecte
-> que falla en silenci.
+> ✅ **Contrasenya passada el mateix dia.** D'ell només queda **el «confirmat» per escrit del `/100`**.
+> Si contesta llarg sobre famílies i se'l salta, repreguntar-ho sol: és l'únic punt del projecte que
+> falla en silenci.
 
 **Bloc C — Pendent amb l'Adrià.** Revisat contra els seus correus del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`), tres dels pendents ja tenen resposta o camí:
