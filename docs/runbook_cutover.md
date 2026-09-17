@@ -28,10 +28,34 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 ---
 
-## Pas solt — activar les 12 famílies
+## ~~Pas solt — activar les 12 famílies~~ ✅ FET el 17/09/2026
 
-No és del dia del tall: es pot fer qualsevol dia **de dia i mirant-ho**, i millor com abans. El codi
-està desplegat i validat des del 16/09/2026; el que queda és el `UPDATE` i la comprovació.
+**Run 139, `SUCCESS`.** Es va fer alhora que la publicació de la continuïtat d'identificadors, perquè
+les dues necessitaven el mateix llindar obert. Resultat a `dbo`: **5.650 dels 5.651 clients amb el
+codi de KAIS conservat**, 14 famílies, 124 línies amb la fórmula quadrant a totes, i les guardes
+tornades al seu lloc a la mateixa sessió.
+
+⚠️ **Va costar dos runs fallits i val la pena saber per què.** El run 136 (la primera execució
+automàtica, la nit del 16 al 17) va acabar `FAILED` amb dos `CRITICAL`:
+
+- **`vanished_ids`, 5.655 identificadors.** No era un error: `dbo` portava CardCodes des del 24/08 i
+  `staging` portava codis de KAIS des que es va implementar el `COALESCE` el 28/08. Aquell canvi havia
+  de creuar aquesta porta algun dia.
+- **`lines_orphan_client`, 50 línies.** Aquest sí que era un problema real: en mode INCREMENTAL,
+  `sp_load_invoice_lines` **copia de `dbo`** les línies dels documents que no es refresquen, i
+  aquelles portaven els codis de client vells. La taula quedava amb dues convencions barrejades.
+
+**Tocar la fórmula dels identificadors obliga a `@ForceFullLines=1`.** És el mateix parany que el
+`discount`, però allà el codi ho detecta sol amb `DISCOUNT_AS_PERCENT_PUBLISHED` i aquí no hi ha res
+equivalent: qui ho va caçar va ser `lines_orphan_client`, que per això existeix.
+
+**Queda pendent, i és cosmètic:** a SAP hi ha un article de baixa amb la família `KM 0` amb un espai,
+duplicant `KM0`. Surt com una catorzena família amb un sol producte. Corregir-ho a SAP les deixa en 13.
+
+<details>
+<summary>El procediment que es va seguir, per si cal repetir-lo</summary>
+
+No és del dia del tall: es pot fer qualsevol dia **de dia i mirant-ho**.
 
 **0. Abans de res, que el run de la nit fos verd.** Si no ho era, això s'atura aquí.
 
@@ -97,6 +121,8 @@ protecció contra un canvi massiu d'identificadors està desactivada per a tot, 
 
 **6. Avisar l'Adrià** que el canvi ja és a la base de dades, perquè els ids de família que veurà són
 nous. Ho té acceptat i el correu del 16/09 l'hi anuncia, però la data li serveix.
+
+</details>
 
 ---
 

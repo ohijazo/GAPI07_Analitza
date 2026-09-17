@@ -232,6 +232,10 @@ notava perquè no havia canviat res.
 d'`AE01SAPRDP` i la tasca **`GAPI07 Refresca sap_raw`** el llança cada dia a les **02:45** amb
 `AGRIENERGIA\sapsistema`.
 
+✅ **I el 17/09/2026 el pipeline va publicar per primera vegada des del 24/08** — run **139**,
+`SUCCESS`. Veure *La primera publicació* més avall: va costar dos runs fallits, i cap dels dos era
+una avaria.
+
 **Provat pel camí real, no per l'aproximat.** La prova del migdia (`--once` a mà, 19 s, `OITM` 2.028
 / `OITB` 110 / `OSLP` 49, les xifres del run 91) corria amb `ohijazo` i **no demostrava res sobre el
 compte de la tasca**. La prova bona és la de les **15:20:48**: Sistemes van llançar la tasca, va
@@ -804,6 +808,46 @@ La segona pregunta **no la genera el Worker, la genera el projecte sencer**, i e
 migració a Service Layer. Anar per l'API oficial *mitiga* el risc —era un dels set motius de §3.1—
 però no l'elimina. Val més tenir-ho contestat per escrit ara que descobrir-ho en una auditoria, i
 falten dos mesos per a productiva.
+
+### La primera publicació (17/09/2026)
+
+El run **139** és el primer swap des del **24/08/2026**. `dbo.est_*` portava 24 dies congelat al run
+91 perquè el job avortava cada nit amb `ABORTED_STALE_MIRROR`, i quan el Worker va començar a córrer
+de debò van sortir dos `CRITICAL` alhora. **Cap dels dos era una avaria**, i val la pena distingir-los
+perquè es van arreglar de maneres diferents.
+
+**Run 136 — la primera execució automàtica, `FAILED`:**
+
+| Check | Què passava |
+|---|---|
+| `vanished_ids`, **5.655 ids** | `dbo` portava CardCodes des del 24/08; `staging` porta codis de KAIS des que es va implementar el `COALESCE` el 28/08. El canvi d'identificadors havia de creuar aquesta porta algun dia |
+| `lines_orphan_client`, **50 línies** | En mode INCREMENTAL, `sp_load_invoice_lines` **copia de `dbo`** les línies dels documents que no es refresquen. Aquelles portaven els codis vells: la taula quedava amb **dues convencions barrejades** |
+
+El primer es resol obrint `ID_DROP_MAX` expressament un cop. **El segon no**: es resol amb
+`@ForceFullLines=1`, que reconstrueix totes les línies amb els codis nous. Comprovat en mode
+inspecció abans de publicar: les òrfenes passen de 50 a **0**.
+
+> **Tocar la fórmula dels identificadors obliga a un FULL de línies.** És el mateix parany que el
+> `discount` —una taula amb dues convencions, cada meitat coherent amb ella mateixa— però allà el codi
+> ho detecta sol amb `DISCOUNT_AS_PERCENT_PUBLISHED` i **aquí no hi ha res equivalent**. Qui ho va
+> caçar va ser `lines_orphan_client`, que existeix precisament per això. Si algun dia es toca
+> `etl.vw_client_code`, això torna a passar.
+
+**Run 139 — publicat**, amb el llindar obert, `@ForceFullLines=1` i el flag de famílies activat alhora
+(les dues coses necessitaven la mateixa porta oberta). El llindar es va tornar a tancar **a la mateixa
+sessió**, dins d'un `finally`: no depèn que ningú se'n recordi.
+
+| | |
+|---|---|
+| Clients | **5.651**, dels quals **5.650 amb el codi de KAIS conservat** i 1 amb CardCode |
+| Famílies | **14** |
+| Línies | **124**, amb `net_amount = price × qty × discount` quadrant a **totes** |
+| Amb quantitat negativa | 32 — devolucions i abonaments, com exigeix la guia |
+| Rang de dates | 18/05/2026 → 16/09/2026 |
+| Guardes | `ID_DROP_MAX`=10, `HISTORY_FLOOR_ENFORCE`=1, `LINES_MIN_RATIO`=0.95, `MIRROR_MAX_AGE_HOURS`=6 |
+
+Els dos WARN que queden són coneguts i benignes: un client apuntat com a predecessor per dos
+successors, i una adreça que ha canviat de nom sense canviar de número.
 
 ### Les famílies: el problema dels 782 articles no existia (16/09/2026)
 
