@@ -907,9 +907,32 @@ són variants d'articles que ja existeixen i n'hereten la família.
 | `34561` MIE CREME (PLASTICO) | `30780` MIE CREME | MOULIN DE COLAGNE |
 | `50150`, `50550` | — (per subfamília ECOLÒGICA) | ECOLÒGIQUES |
 
-**Queda `01761 ESPECIFICA TURRIS`** (62.675 €), i és genuïnament ambigu: al rang `01xxx` hi conviuen
-`ESPECIFICA` i `GRANEL` —sembla que la frontera és ensacat contra granel, però no està confirmat— i
-**s'ha de preguntar a comercial, no deduir**.
+**Queda `01761 ESPECIFICA TURRIS`** (62.675 €), i és genuïnament ambigu. ⏳ **Preguntat a comercial el
+17/09/2026.**
+
+Es va mirar de resoldre per la unitat de venda i **la regla no es sosté**:
+
+| A SAP són… | Unitat a KAIS |
+|---|---|
+| `GRANEL` | `GRA` — 13 de 13 |
+| `ESPECIFICA` | `S25` — 10, **però 2 en `GRA`** |
+
+Els dos contraexemples (`01451 ESPECIFICA FORÇA RIUS`, `01601 ESPECIFICA PANIFICABLE RIUS`) tenen
+**exactament la mateixa forma** que el TURRIS: «ESPECIFICA \<client\>», a granel. Entre articles
+comparables, 13 van a `GRANEL` i 2 a `ESPECIFICA`: és una majoria, no un criteri. I la subfamília de
+KAIS (`MITJA FORÇA FC`) apuntaria a una **tercera** resposta, `TRADICIONALS`.
+
+Que el `01761` és granel sí que està establert: unitat `GRA` i **148.520 kg en 6 línies en un mes a
+0,42 €/kg**. Cisternes, no sacs.
+
+La pregunta que se'n va fer, i que val més que la resposta: *de les farines específiques servides a
+granel, unes van a GRANEL i d'altres a ESPECIFICA — **quin és el criteri**?* Amb el criteri, els
+articles que vagin sortint es classifiquen sols.
+
+⚠️ **I una cosa a part:** a `DB_FARINERA_TEST` aquest article és una **closca buida** —sense nom, sense
+unitat de venda, al grup 108 amb *TAXA GENERALITAT* i *Aigua Test*— mentre que a KAIS està complet i
+actiu. **Mirar com està a `DB_FARINERA_PROD` abans del tall**: si allà també li falta el nom, el
+problema no és la família sinó l'article.
 
 La lliçó, que és la mateixa de tot el projecte: **la taxonomia de KAIS i la de SAP tenen els mateixos
 noms en nivells diferents.** Qualsevol mapatge entre les dues s'ha de comprovar contra les dades de

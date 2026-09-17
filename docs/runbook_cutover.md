@@ -143,6 +143,11 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    dotnet run --project P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -- --probe
    ```
 
+2b. **Comprovar `01761 ESPECIFICA TURRIS` a la productiva.** A `DB_FARINERA_TEST` és una closca buida
+   —sense nom ni unitat de venda, al grup dels articles de prova— mentre que a KAIS està complet i ha
+   facturat 62.675 € en dotze mesos. Si a `DB_FARINERA_PROD` també li falta el nom, el problema no és
+   la família: és l'article. I si està bé, posar-li la família que hagi dit comercial.
+
 3. **Poblar els `U_FCCodiKais` que faltin a `OCRD`.** Aquest és el punt amb data: un client existent
    que es quedi amb el camp buit cau al `CardCode` de SAP i **Analitza el veu com un client nou**, en
    silenci i el dia que menys es mira. La sonda llista els que queden buits; no es poden filtrar pels
