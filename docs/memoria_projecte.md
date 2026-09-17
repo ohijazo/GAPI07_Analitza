@@ -1292,9 +1292,18 @@ contracte. ✅ Correu enviat el 31/08/2026 (`resposta_adria_2.docx`). ✅ **Sist
 l'accés el 10/09/2026**: Analitza ja entra per VPN a `AE01SAPSQL:1433`, i no calia enviar-los cap
 endpoint perquè les credencials de VPN són les que ja tenien.
 
-✅ **Contrasenya passada el 16/09/2026** per un canal a part. **El Bloc B queda tancat**: Analitza té
-ruta, credencial i dades. Va costar de maig a setembre i el que el va resoldre no va ser una obertura
-de firewall —que mai no va caldre— sinó demanar l'activació i adonar-se que entraven per VPN.
+✅ **Contrasenya passada el 16/09/2026** per un canal a part, i **l'endpoint el 17/09**
+(`192.168.11.238:1433`, BD `IntercanviSAP`), que és el que ell va demanar tot seguit: tenia
+credencial i no sabia on connectar-se.
+
+Va costar de maig a setembre i el que el va resoldre no va ser una obertura de firewall —que mai no
+va caldre— sinó demanar l'activació i adonar-se que entraven per VPN.
+
+⏳ **Però el Bloc B no es pot donar per tancat fins que l'Adrià confirmi que ha connectat.** El 16/09
+es va donar per fet i faltava l'endpoint. La lliçó és la mateixa de tota la setmana: **fins que algú
+no recorre el camí sencer, això està fet sobre el paper**. Si li falla, el primer a mirar no és la
+credencial sinó si la VPN encamina cap a `192.168.11.x` — els clients de VPN surten per
+`192.168.254.x`, i que els habilitessin l'accés no vol dir que la ruta hi sigui.
 
 > ⚠️ Sistemes ho van comunicar com «les credencials i l'url són les mateixes, no ha canviat res».
 > Per la VPN és cert; **pel login de SQL no**. La contrasenya d'`analitza_ro` es va rotar el
