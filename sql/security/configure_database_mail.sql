@@ -1,17 +1,27 @@
 /* =========================================================================
    configure_database_mail.sql
    -------------------------------------------------------------------------
-   Configura Database Mail amb M365 (smtp.office365.com:587 TLS) i deixa el
-   SQL Agent enviant notificacions al operador AnalitzaOps quan el job falla.
+   Configura Database Mail amb el mailbox de servei d'M365
+   (smtp.office365.com:587 STARTTLS) i deixa el SQL Agent notificant
+   l'operador AnalitzaOps quan el job Analitza_ETL_Daily falla.
 
-   ANTES d'executar:
-     1) Substituir <APP_PASSWORD_O_CONTRASENYA> per la contrasenya real
-        (idealment App Password si tens MFA).
-     2) Assegurar que SMTP AUTH esta habilitat al mailbox d'M365.
+   NO S'EXECUTA A MA. El llança Configure-DatabaseMail.ps1, que demana la
+   contrasenya interactivament i substitueix els marcadors en memoria. Aqui no
+   hi ha d'haver mai una credencial: Regla 03.
 
-   DESPRES d'executar:
-     - El script reinicia SQL Agent (necessari per llegir nous registres).
-     - El test de mail (paso 8) ha d'arribar a la bustia en 30s.
+   Marcadors que substitueix el llancador:
+     {{FROM_ADDRESS}}  adreca remitent      p.ex. sql-alerts@agrienergia.com
+     {{SMTP_USER}}     usuari d'autenticacio -- OJO: a M365 sovint NO coincideix
+                       amb l'adreca (pot ser ...@<tenant>.onmicrosoft.com)
+     {{SMTP_PASSWORD}} contrasenya, nomes en memoria
+     {{ALERT_TO}}      qui rep les alertes
+
+   ABANS d'executar cal que SMTP AUTH estigui habilitat al mailbox: al tenant
+   esta desactivat per defecte. Si no ho esta, el test del pas 8 falla amb un
+   error d'autenticacio i no es un problema d'aquest script.
+
+   DESPRES: cal reiniciar el SQL Agent (pas 7) perque llegeixi els registres
+   nous, i el test del pas 8 ha d'arribar en menys d'un minut.
    =========================================================================*/
 
 /* ---------- 1. Activar Database Mail XPs ---------- */
@@ -38,19 +48,23 @@ IF EXISTS (SELECT 1 FROM msdb.dbo.sysmail_account WHERE name = 'AnalitzaSQL_M365
     EXEC msdb.dbo.sysmail_delete_account_sp @account_name = N'AnalitzaSQL_M365';
 GO
 
-/* ---------- 3. Crear compte SMTP ---------- */
+/* ---------- 3. Crear compte SMTP ----------
+   @email_address i @username son coses diferents i a M365 sovint no
+   coincideixen: el primer es l'adreca que veura qui rebi el correu, el segon
+   es la credencial amb que s'autentica. Posar-hi el mateix valor "perque sembla
+   logic" es la manera mes rapida de passar una tarda depurant un 535. */
 EXEC msdb.dbo.sysmail_add_account_sp
     @account_name        = N'AnalitzaSQL_M365',
-    @description         = N'Compte M365 SMTP per a notificacions del SQL Agent',
-    @email_address       = N'ohijazo@agrienergia.com',     -- From address
+    @description         = N'Mailbox de servei M365 per a notificacions del SQL Agent',
+    @email_address       = N'{{FROM_ADDRESS}}',
     @display_name        = N'SQL Server AE01SAPSQL',
-    @replyto_address     = N'ohijazo@agrienergia.com',
+    @replyto_address     = N'{{FROM_ADDRESS}}',
     @mailserver_name     = N'smtp.office365.com',
     @mailserver_type     = N'SMTP',
     @port                = 587,
-    @enable_ssl          = 1,                              -- STARTTLS
-    @username            = N'ohijazo@agrienergia.com',
-    @password            = N'<APP_PASSWORD_O_CONTRASENYA>'; -- !! substituir !!
+    @enable_ssl          = 1,                      -- STARTTLS
+    @username            = N'{{SMTP_USER}}',
+    @password            = N'{{SMTP_PASSWORD}}';
 GO
 
 /* ---------- 4. Crear profile i lligar-lo al compte ---------- */
@@ -81,44 +95,39 @@ EXEC master.dbo.xp_instance_regwrite
     N'DatabaseMailProfile', N'REG_SZ', N'AnalitzaSQLMail';
 GO
 
-/* ---------- 6. Actualitzar operador AnalitzaOps ---------- */
+/* ---------- 6. Actualitzar l'operador AnalitzaOps ----------
+   Qui rep les alertes hauria de ser una adreca institucional, no personal: el
+   dia que qui la llegeix no hi sigui, les alertes s'han de seguir veient. */
 EXEC msdb.dbo.sp_update_operator
     @name = N'AnalitzaOps',
-    @email_address = N'ohijazo@agrienergia.com';
+    @email_address = N'{{ALERT_TO}}';
 GO
 
-/* ---------- 7. Reiniciar SQL Agent perque agafi els nous registres ----------
-   No es pot reiniciar el SQL Agent des d'una connexio que no sigui local;
-   recomanem fer-ho manualment a SSMS: right-click sobre SQL Server Agent ->
-   Restart, o via Services.msc.
-   Alternativament des d'aquest mateix script (necessita xp_cmdshell habilitat
-   i privilegi sysadmin):
-       EXEC xp_cmdshell 'net stop "SQLSERVERAGENT" && net start "SQLSERVERAGENT"';
-*/
+/* ---------- 7. Reiniciar el SQL Agent ----------
+   Cal perque llegeixi els registres nous del pas 5. No es pot fer des d'una
+   connexio remota: a SSMS, boto dret sobre SQL Server Agent -> Restart, o des
+   de services.msc a la maquina. */
 
-/* ---------- 8. Test de mail ---------- */
+/* ---------- 8. Test ---------- */
 EXEC msdb.dbo.sp_send_dbmail
     @profile_name = N'AnalitzaSQLMail',
-    @recipients   = N'ohijazo@agrienergia.com',
+    @recipients   = N'{{ALERT_TO}}',
     @subject      = N'Test Database Mail des de AE01SAPSQL / IntercanviSAP',
     @body         = N'Si reps aquest correu, Database Mail esta configurat correctament.';
 GO
 
-/* ---------- 9. Comprovar estat del test ---------- */
-WAITFOR DELAY '00:00:05';
+/* ---------- 9. Comprovar l'estat del test ---------- */
+WAITFOR DELAY '00:00:10';
 
-SELECT TOP 3
-    sent_status, sent_date, recipients, subject,
-    LEFT(last_mod_date_text, 30) AS last_mod
-FROM   (SELECT sent_status, sent_date, recipients, subject,
-               CAST(last_mod_date AS varchar(30)) AS last_mod_date_text,
-               mailitem_id
-        FROM msdb.dbo.sysmail_allitems) x
-ORDER BY mailitem_id DESC;
+SELECT TOP 3 sent_status, sent_date, recipients, subject
+FROM   msdb.dbo.sysmail_allitems
+ORDER  BY mailitem_id DESC;
 
-/* Si veus alguna fila amb sent_status='failed', mira: */
-SELECT TOP 3 send_request_date, log_date, [description]
+/* Si hi ha cap fila amb sent_status='failed', el motiu es aqui. Un error 535
+   vol dir credencial rebutjada: mirar si SMTP AUTH esta habilitat al mailbox
+   abans de sospitar de la contrasenya. */
+SELECT TOP 5 log_date, event_type, [description]
 FROM   msdb.dbo.sysmail_event_log
 WHERE  event_type IN ('error','warning')
-ORDER BY log_id DESC;
+ORDER  BY log_id DESC;
 GO
