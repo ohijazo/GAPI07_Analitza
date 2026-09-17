@@ -12,6 +12,10 @@ El Worker corre a `AE01SAPRDP` per la tasca **`GAPI07 Refresca sap_raw`** (arrel
 `AGRIENERGIA\sapsistema`). Provat el mateix dia a les 15:20:48: `LastTaskResult = 0` **i** les nou
 entitats de `sap_raw.sync_state` segellades a la mateixa hora.
 
+✅ **I dispara sola.** La nit del 16 al 17/09/2026 va córrer a les **02:45:02** amb `LastTaskResult = 0`
+sense que ningú la llancés. Que funcioni quan se li diu i que corri cada nit són dues coses
+diferents, i les dues estan comprovades.
+
 Les dues proves no valen igual, i és la lliçó del dia: `--once` llançat a mà amb `ohijazo` diu que
 els binaris i la configuració són bons, però **no diu res del compte que correrà de nit**. La que
 compta és la tasca, llançada pel seu principal, verificada contra `sync_state`.
