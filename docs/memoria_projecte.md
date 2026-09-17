@@ -887,6 +887,34 @@ La feina real són **vuit articles**, i la proposta surt de la subfamília que K
 La resta de la llista són palets, sacs, serveis de transport i residus, que **han de continuar sense
 família**: no són producte i avui ja cauen al mateix calaix.
 
+#### Fet el 17/09/2026 — i la font bona era SAP, no KAIS
+
+**Set dels vuit classificats** (run 140, `SUCCESS`), i el `KM 0` amb espai corregit: les famílies
+passen de 14 a **13** i la facturació sense classificar de 326.702 € (1,47%) a **~116.000 € (0,52%)**.
+
+⚠️ **La proposta inicial era dolenta en quatre dels vuit.** Sortia de traduir les subfamílies de KAIS
+(`FORÇA FC`, `HAUBANNE`) com si fossin famílies, i **a SAP són subfamílies**: posar-les hauria creat
+tres famílies noves a l'aplicació de l'Olga. Ho va destapar l'Oscar en veure que el camp de família
+és una llista desplegable i que `FORÇA` no hi sortia.
+
+**La resposta la donava SAP mateix**, amb els 198 articles que ja tenien els dos camps: els `(B4)`
+són variants d'articles que ja existeixen i n'hereten la família.
+
+| Article | Ve de | Família |
+|---|---|---|
+| `30182`, `30151`, `30131` | `30180`, `30150`, `30130` | TRADICIONALS |
+| `30751` | `30750` FARINA SEGOL | ALTRES CEREALS |
+| `34561` MIE CREME (PLASTICO) | `30780` MIE CREME | MOULIN DE COLAGNE |
+| `50150`, `50550` | — (per subfamília ECOLÒGICA) | ECOLÒGIQUES |
+
+**Queda `01761 ESPECIFICA TURRIS`** (62.675 €), i és genuïnament ambigu: al rang `01xxx` hi conviuen
+`ESPECIFICA` i `GRANEL` —sembla que la frontera és ensacat contra granel, però no està confirmat— i
+**s'ha de preguntar a comercial, no deduir**.
+
+La lliçó, que és la mateixa de tot el projecte: **la taxonomia de KAIS i la de SAP tenen els mateixos
+noms en nivells diferents.** Qualsevol mapatge entre les dues s'ha de comprovar contra les dades de
+SAP que ja estan classificades, no contra els noms.
+
 #### KAIS no és la font, i omplir-ho des d'allà seria pitjor
 
 Es va explorar KAIS (`vkais\kais`, BD `GWSV_AGRI`) buscant-hi la classificació. **No hi és.**
