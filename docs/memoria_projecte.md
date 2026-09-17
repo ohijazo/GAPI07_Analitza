@@ -1437,6 +1437,29 @@ dotnet run --project P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -- --probe
 dotnet run --project P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -- --backfill --from 2020-01-01
 ```
 
+### Provar que l'alerta per correu funciona
+
+**Un correu enviat amb `sp_send_dbmail` no demostra res sobre el job**: aquell no passa pel SQL
+Agent, i el job sí. Es pot tenir el test a la bústia i no rebre res la nit que falli de debò.
+
+La manera de provar-ho sense moure cap dada: posar el llindar de frescor a 0 i llançar el job. Aquell
+camí de `sp_run_all` fa `THROW` **abans de tocar `staging`**, així que només deixa un run
+`ABORTED_STALE_MIRROR` a l'historial.
+
+```sql
+UPDATE IntercanviSAP.cfg.settings SET [value]='0' WHERE [key]='MIRROR_MAX_AGE_HOURS';
+EXEC msdb.dbo.sp_start_job @job_name = N'Analitza_ETL_Daily';
+-- esperar que acabi, mirar la bustia, i tot seguit:
+UPDATE IntercanviSAP.cfg.settings SET [value]='6' WHERE [key]='MIRROR_MAX_AGE_HOURS';
+```
+
+Ha d'arribar un correu del SQL Agent amb `STATUS: Failed`. Fet el **17/09/2026** (run 141) i va
+arribar. **El run 141 és aquesta prova, no una avaria** — si es mira l'historial i es veu un
+`ABORTED_STALE_MIRROR` aquell matí, és això.
+
+Val la pena repetir-ho després de qualsevol canvi al SQL Agent, al mailbox o a la contrasenya: és
+l'única comprovació que recorre el camí sencer.
+
 ### Diagnòstic
 
 ```sql
