@@ -170,3 +170,21 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FAMILY_FROM_COMMERCIAL'
     INSERT cfg.settings ([key], [value], description)
     VALUES ('FAMILY_FROM_COMMERCIAL', '0', 'Origen de est_families_productes i de est_productes.product_categories_id. 0 = els 110 grups d article d OITB (el que hi ha avui); 1 = la familia comercial OITM.U_SEIFamCialCat, les 12 que Analitza ensenya. Canviar-lo fa desapareixer 110 identificadors alhora, aixi que vol apujar ID_DROP_MAX el mateix dia i tornar-lo a baixar l endema.');
 GO
+
+/* -------------------------------------------------------------------------
+   2026-09-17 - cfg.settings.RECEIVABLES_IN_USE
+
+   Analitza te est_cobraments a la seva BD pero NO la importa: la van treure fa
+   temps perque arrossegava cobraments pendents molt antics i gairebe tots els
+   clients hi sortien amb deute. Confirmat per l'Adria el 17/09/2026.
+
+   Mentre no la llegeixin, el check receivables_empty passa de CRITICAL a WARN:
+   bloquejar el swap sencer per aquella taula aturaria clients, productes i
+   linies d'albara -que si que fan servir- per una que no miren.
+
+   Es torna a '1' el dia que la recuperin.
+   ------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'RECEIVABLES_IN_USE')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('RECEIVABLES_IN_USE', '0', 'Analitza importa est_cobraments? 0 = no (el check receivables_empty es WARN i no atura el swap); 1 = si (torna a ser CRITICAL). A 0 des del 17/09/2026 per confirmacio de l Adria. Revisar-ho despres del cutover: la SAP productiva nomes porta factures realment pendents, aixi que el motiu pel qual la van desactivar no travessa el tall.');
+GO

@@ -529,6 +529,17 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FAMILY_FROM_COMMERCIAL'
     INSERT cfg.settings ([key], [value], description)
     VALUES ('FAMILY_FROM_COMMERCIAL', '0', 'Origen de est_families_productes i de est_productes.product_categories_id. 0 = els 110 grups d article d OITB (el que hi ha avui); 1 = la familia comercial OITM.U_SEIFamCialCat, les 12 que Analitza ensenya. Canviar-lo fa desapareixer 110 identificadors alhora, aixi que vol apujar ID_DROP_MAX el mateix dia i tornar-lo a baixar l endema.');
 
+/* Analitza importa est_cobraments?
+     '0' = no. El check receivables_empty baixa a WARN i no atura el swap.
+     '1' = si. Torna a ser CRITICAL.
+   A '0' des del 17/09/2026: l Adria va confirmar que la taula hi es pero no la
+   llegeixen. La van treure perque arrossegava cobraments pendents molt antics.
+   Revisar-ho despres del cutover: la productiva nomes porta factures realment
+   pendents, aixi que el motiu de desactivar-la no travessa el tall. */
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'RECEIVABLES_IN_USE')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('RECEIVABLES_IN_USE', '0', 'Analitza importa est_cobraments? 0 = no (receivables_empty es WARN i no atura el swap); 1 = si (CRITICAL). A 0 des del 17/09/2026 per confirmacio de l Adria.');
+
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('HISTORY_FLOOR_ENFORCE', '1', 'Atura el swap si la data mes antiga de staging.est_linies_albara es anterior a la de dbo. Analitza reemplaça el seu historic a partir de la data minima que li enviem, aixi que fer-la retrocedir els esborra dades. Nomes es posa a 0 per a un backfill volgut, i es torna a 1 tot seguit.');

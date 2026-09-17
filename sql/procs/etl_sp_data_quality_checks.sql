@@ -271,13 +271,34 @@ BEGIN
             SET @CriticalCount = @CriticalCount + 1;
         END
 
+        /* La severitat d'aquest depen de si Analitza llegeix la taula.
+           cfg.settings.RECEIVABLES_IN_USE: '0' = WARN, '1' = CRITICAL.
+
+           A '0' des del 17/09/2026: l'Adria va confirmar que est_cobraments
+           esta a la seva BD pero **no la importen**. La van treure fa temps
+           perque arrossegava cobraments pendents molt antics i gairebe tots
+           els clients hi sortien amb deute. Mentre no la llegeixin, bloquejar
+           el swap sencer per aquella taula aturaria clients, productes i
+           linies d'albara -que si que fan servir- per una que no miren.
+
+           Es torna a '1' el dia que la recuperin. Es previsible que sigui
+           despres del cutover: la SAP productiva nomes porta les factures
+           realment pendents de cobrament, aixi que la cua d'antigues que els
+           va fer desactivar-la no travessa el tall. */
+        DECLARE @recv_in_use bit = 0;
+        SELECT @recv_in_use = ISNULL(TRY_CAST([value] AS bit), 0)
+        FROM   cfg.settings WHERE [key] = 'RECEIVABLES_IN_USE';
+
         IF @recv_before > 0 AND @recv_now = 0
         BEGIN
             INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
-            VALUES (@rid, 'receivables_empty', 'CRITICAL',
+            VALUES (@rid, 'receivables_empty',
+                    CASE WHEN @recv_in_use = 1 THEN 'CRITICAL' ELSE 'WARN' END,
                     'staging.est_cobraments ha quedat BUIDA i ahir tenia '
-                    + CAST(@recv_before AS varchar(20)) + ' files. Swap avortat.');
-            SET @CriticalCount = @CriticalCount + 1;
+                    + CAST(@recv_before AS varchar(20)) + ' files.'
+                    + CASE WHEN @recv_in_use = 1 THEN ' Swap avortat.'
+                           ELSE ' No atura el swap: Analitza no importa aquesta taula (RECEIVABLES_IN_USE=0).' END);
+            IF @recv_in_use = 1 SET @CriticalCount = @CriticalCount + 1;
         END
 
         /* ----- 10) La data mes antiga no pot retrocedir -----
