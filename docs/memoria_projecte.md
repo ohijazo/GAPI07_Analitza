@@ -236,6 +236,15 @@ d'`AE01SAPRDP` i la tasca **`GAPI07 Refresca sap_raw`** el llança cada dia a le
 `SUCCESS`. Veure *La primera publicació* més avall: va costar dos runs fallits, i cap dels dos era
 una avaria.
 
+✅ **La nit del 17 al 18/09/2026, el primer cicle complet desatès**: run **143**, `SUCCESS` en 11
+segons, cap `CRITICAL`, ningú al davant. Worker a les 02:45, ETL a les 03:00, swap fet. Amb això la
+cadena queda demostrada de punta a punta i el que queda del projecte és el cutover.
+
+> El run 143 va treure un WARN nou, `volume_anomaly`: *cap línia d'albarà el 17/09*. **A
+> `DB_FARINERA_TEST` això és normal** —aquella companyia té 62 línies inventades i qualsevol dia
+> sense moviments el dispara—, i a productiva sí que voldrà dir alguna cosa. No s'ha de tocar el
+> check per fer-lo callar a test.
+
 **Provat pel camí real, no per l'aproximat.** La prova del migdia (`--once` a mà, 19 s, `OITM` 2.028
 / `OITB` 110 / `OSLP` 49, les xifres del run 91) corria amb `ohijazo` i **no demostrava res sobre el
 compte de la tasca**. La prova bona és la de les **15:20:48**: Sistemes van llançar la tasca, va
