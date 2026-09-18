@@ -20,7 +20,7 @@ Quatre processos connecten al Service Layer, i **tots quatre ho fan amb el meu u
 | Procés | Quan es connecta |
 |---|---|
 | **GAPI07** — Analitza CM | Cada nit a les **02:45**, durant uns 20 segons |
-| **GAPI03** — CRM | **Cada 15 minuts**, tot el dia, més una reconciliació a les 03:00 |
+| **GAPI03** — CRM | **Cada hora**, més una reconciliació a les 03:00 |
 | **Preparació de comandes de venda** | En qualsevol moment de la jornada |
 | **Actualitzador de preus/tarifes** | En qualsevol moment de la jornada |
 
@@ -56,16 +56,20 @@ confirmo que no ens trepitgem i, si cal, moc la nostra tasca — canviar-li l'ho
 no depèn de ningú. Demanaria **mitja hora de separació** i no cinc minuts, perquè el Service Layer no
 porta bé dos `Login` del mateix usuari amb poca diferència.
 
-**Per als altres tres, el panorama és pitjor i sí que et demanaria usuaris propis:**
+**Per als altres tres sí que et demanaria usuaris propis:**
 
 | Procés | Per què no pot compartir |
 |---|---|
-| **GAPI03** | Cada quart d'hora, tot el dia. Pràcticament sempre en sessió |
+| **GAPI03** | Cada hora. Entre cicles la sessió es manté oberta una bona estona, i la finestra no cau sempre a la mateixa hora |
 | **Preparació de comandes** | A qualsevol hora, sense finestra previsible |
 | **Actualitzador de preus** | Igual |
 
-Si s'han de prioritzar, **el primer seria GAPI03**, que és el que està connectat permanentment i el
-que ara mateix fa més difícil garantir res a la resta.
+De GAPI03 n'estic mirant una millora pel meu costat —que tanqui sessió en acabar cada cicle en
+comptes de mantenir-la— i, si me'n surto, podria compartir el compte nocturn amb GAPI07 i estalviar
+una altra llicència. Ja t'ho diré.
+
+Si s'han de prioritzar, **el primer seria el dels dos interactius**, que són els que no tenen cap
+finestra previsible.
 
 **Un detall sobre el compte de GAPI07**, tant si és `proceso nocturno` com si n'és un de nou: només
 necessita **lectura**. No escriu mai a SAP, i les entitats són aquestes nou: `BusinessPartners`,

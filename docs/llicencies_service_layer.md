@@ -27,7 +27,7 @@ pregunta a fer a cada projecte no és quan corre sinó **si fa Logout**.
 | Projecte | Usuari de SL avui | Quan corre | Fa `Logout`? |
 |---|---|---|---|
 | **GAPI07_Analitza** (aquest) | `OHijazo` | **02:45, ~20 s.** L'únic amb finestra fixa i curta | ✅ **Sí**, a `DisposeAsync` |
-| **GAPI03_CRM** | user-secrets | **cada 15 min**, tot el dia, + reconciliació a les **03:00** | ❓ |
+| **GAPI03_CRM** | user-secrets | **cada hora** (`IncrementalInterval: 01:00:00`) + reconciliació a les **03:00** | ⚠️ Sí, però **només en aturar el servei** |
 | **preparacioComandesVendaSAP** | `OHijazo` | **en qualsevol moment** | ❓ |
 | **ActualitzadorPreusSap** | `OHijazo` | **en qualsevol moment** | ✅ Sí, i amb test que ho vigila |
 
@@ -44,27 +44,50 @@ Fora de l'inventari:
 ## La conclusió que en surt: quatre, no dos
 
 L'excepció d'en Carles demana **poder assegurar** que dos processos no coincideixen. Mirat projecte
-per projecte, **gairebé cap parella ho compleix**:
+per projecte:
 
-- **GAPI03 no és nocturn**: sincronitza **cada 15 minuts** tot el dia. Com `GAP001`, està
-  permanentment en sessió i **no pot compartir amb ningú per definició**. La seva reconciliació de les
-  03:00 cau a quinze minuts de la nostra, que és justament on es trobarien si ho intentéssim.
+- **GAPI03 va passar a cada hora el 18/09/2026** (abans, cada 15 minuts). Això el treu de la
+  categoria de «sempre en sessió», però **encara no el fa compartible**, per una raó que no es veu
+  a la configuració. Veure el quadre de sota.
 - **`preparacioComandesVenda` i `ActualitzadorPreus` poden córrer en qualsevol moment**, així que no
   es pot assegurar res: ni entre ells ni respecte del nocturn.
 
-O sigui que el repartiment honest és **un usuari per procés**, que era la recomanació del partner des
-del principi:
+> ### Per què «cada hora» encara no és suficient
+>
+> A GAPI03 el client de Service Layer és un **`AddSingleton`** dins d'un `while` permanent: viu tota
+> la vida del procés i el seu `Logout` no s'executa **fins que s'atura el servei**. La sessió es
+> renova sola als 29 minuts.
+>
+> Amb cicles horaris, això vol dir **mitja hora ocupada i mitja lliure**: es fa login, la sessió mor
+> per inactivitat als 30 minuts, i es torna a entrar al cicle següent. És una millora real respecte
+> de cada quart d'hora, on no s'alliberava mai.
+>
+> **Però la finestra ocupada es mou.** El bucle calcula `wait = interval - elapsed` des de
+> l'arrencada, no des de l'hora en punt: si el servei es reinicia a les 02:20, els cicles passen a
+> ser :20 i la mitja hora ocupada tapa les nostres 02:45. Això és «probable», no «assegurat».
+>
+> **El que ho faria determinista és petit**: que GAPI03 tanqui sessió **en acabar cada cicle** i no
+> només en aturar-se. GAPI07 ho té de franc perquè és un procés `--once` que arrenca, sincronitza i
+> mor. Amb aquell canvi, tots dos retindrien la llicència només mentre treballen i **podrien
+> compartir compte de debò**: nosaltres a les 02:45 durant 20 s, ells a l'hora en punt, i la
+> reconciliació de les 03:00 quinze minuts després que haguem plegat.
+
+O sigui que, **tal com està tot avui**, calen tres o quatre comptes:
 
 | Llicència | Per a qui |
 |---|---|
-| 1 | **GAPI07** — nocturn, 20 s, amb Logout |
-| 2 | **GAPI03_CRM** — permanent, cada 15 min |
+| 1 | **GAPI07** — nocturn, 20 s, allibera en acabar |
+| 2 | **GAPI03_CRM** — horari, però reté mitja hora amb finestra que es mou |
 | 3 | **preparacioComandesVendaSAP** |
 | 4 | **ActualitzadorPreusSap** |
 
-**Si només se'n poden aconseguir menys**, la parella menys dolenta és **GAPI07 + ActualitzadorPreus**:
-el segon allibera la sessió de seguida i a les 02:45 no l'està fent servir ningú. És l'única
-combinació on la no-coincidència és gairebé una certesa en comptes d'una esperança.
+**I es poden baixar a tres amb un canvi de codi petit a GAPI03**: que tanqui sessió en acabar cada
+cicle. Llavors GAPI07 i GAPI03 comparteixen el compte nocturn sense que sigui una aposta, i queden
+els dos interactius, que sí que són irreductibles perquè poden córrer a qualsevol hora.
+
+**Si només se'n pot aconseguir un**, ha de ser per a GAPI07: és l'únic que corre **desatès i de
+nit**. Si falla no hi ha ningú al davant, i el que publica al matí ho llegeix directament Analitza;
+els altres tres els fa servir una persona que veuria l'error a la pantalla.
 
 **Però el salt que importa no és de dos a quatre, és de zero a un.** Avui tot corre amb `OHijazo`, un
 usuari **nominal d'una persona**: el dia que canviï de contrasenya o no hi sigui, s'aturen quatre
