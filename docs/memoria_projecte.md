@@ -858,6 +858,40 @@ sessió**, dins d'un `finally`: no depèn que ningú se'n recordi.
 Els dos WARN que queden són coneguts i benignes: un client apuntat com a predecessor per dos
 successors, i una adreça que ha canviat de nom sense canviar de número.
 
+### El backup ja hi era (18/09/2026)
+
+El punt 3 —freqüència i retenció— portava **tres correus sense resposta**. No calia esperar-la:
+`msdb.dbo.backupset` ho diu tot menys una cosa.
+
+**`IntercanviSAP` es copia dues vegades al dia, per dues vies independents:**
+
+| Quan | Què | On |
+|---|---|---|
+| **22:00** | FULL del maintenance plan | `I:\MaintenancePlan\IntercanviSAP\IntercanviSAP_backup_<data>.bak` |
+| **~23:42** | Snapshot **VSS**, o sigui el backup de la VM | dispositiu amb nom de GUID |
+
+Les segones es reconeixen perquè el `physical_device_name` és un `{GUID}` en comptes d'un camí: és la
+signatura d'una còpia feta pel *writer* de VSS. Encaixa amb el que Sistemes ja havien dit al juny,
+que amb el backup complet de la VM n'hi havia prou.
+
+Totes les BD de la instància hi entren —les de SAP, `SBO-COMMON`, `crm_sync_db_dev` de GAPI03 i la
+nostra—, i l'historial de `backupset` arriba **93 dies enrere** (17/06/2026). `IntercanviSAP` està en
+**`SIMPLE`**, coherent amb no fer còpies de log.
+
+**El que no es pot veure des de SQL és quants dies sobreviuen els fitxers a `I:\`.** L'historial de
+`msdb` i la retenció del disc són coses diferents. És l'única part del punt 3 que encara s'ha de
+preguntar, i ara és una pregunta d'una línia.
+
+⚠️ **I un matís que convé no repetir malament.** S'ha dit uns quants cops que «la BD es regenera cada
+nit des de SAP, així que el backup és poc crític». **Des de l'01/09/2026 ja no és del tot cert**:
+`cfg.client_ship_no` **no es pot regenerar** —fixa la meitat dreta de `id_client_location`— i només
+viu aquí. El FULL de les 22:00 la cobreix, i l'exposició màxima és d'un dia, però la frase «es
+regenera sola» ja no descriu tota la base de dades.
+
+> **De passada**: el 15/09/2026 va aparèixer una `DB_FARINERA_TEST2` a les còpies, de 790 MB. No és
+> nostra i ningú ens ha dit res. Pot ser la pista de qui està preparant un refresc de
+> `DB_FARINERA_TEST`, que és una altra pregunta que portem oberta des del 07/09.
+
 ### Les famílies: el problema dels 782 articles no existia (16/09/2026)
 
 Durant setmanes això va anar plantejat com una decisió comercial amb un projecte de classificació al
@@ -1283,8 +1317,8 @@ donar d'alta enlloc de SQL Server; només executa el procés.
 
 | # | Què | Estat |
 |---|---|---|
-| 3 | Freqüència i retenció del backup d'`AE01SAPSQL` | **Segona vegada sense contestar.** Si a la tercera tampoc arriba, configurar el FULL diari pel nostre compte i informar-los |
-| 3 | On van els fitxers del FULL diari d'`IntercanviSAP` | Obert |
+| 3 | ~~Freqüència del backup, i on van els fitxers~~ | ✅ **Mirat el 18/09/2026 a `msdb.dbo.backupset`**, no preguntat. Veure *El backup ja hi era* |
+| 3 | **Quants dies sobreviuen els `.bak` a `I:\`** | Obert, i és l'únic que queda. La freqüència es veu a l'historial; la retenció dels fitxers, no |
 | 6 | ~~Compte SMTP per a Database Mail~~ | ✅ **17/09/2026**: van crear `sql-alerts@agrienergia.com`, que era **l'opció 1** de les tres —un mailbox institucional, no el compte de ningú. Configurat i provat el mateix dia |
 | 8 | ~~Compte de servei~~ | ✅ **16/09/2026**: `AGRIENERGIA\sapsistema` |
 | 8 | ~~Crear `C:\Apps\SapB1AnalitzaSync`~~ | ✅ **16/09/2026**, amb l'ACL correcta |
