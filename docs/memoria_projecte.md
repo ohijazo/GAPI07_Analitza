@@ -1297,8 +1297,8 @@ Va amb el pla de treure `OHijazo` de tot arreu quan es reparteixin les llicènci
 **Pendent, i és l'únic que decideix si el cicle nocturn torna a córrer:** confirmar amb Sistemes que
 la tasca de les 02:45 existeix i està activada a `AE02SAPRDP`, i que `sapsistema` hi té *Log on as a
 batch job*. El `schtasks` respon `Acceso denegado` i no *no s'ha trobat*, cosa que apunta que la
-tasca ja hi és. Text llest a `peticio_sistemes_ae02saprdp.md`. I queda netejar `AE01SAPRDP`: la tasca
-vella i l'`appsettings.Production.json`, que té credencials i ja no fa cap feina.
+tasca ja hi és. Text llest a `peticio_sistemes_ae02saprdp.md`. (De `AE01SAPRDP` no s'ha de netejar
+res: la màquina desapareix — veure més avall.)
 
 #### ✅ Resolt el 28/09/2026: la tasca hi era, i estava DESACTIVADA
 
@@ -1357,14 +1357,27 @@ reintentar una comprovació de només lectura abans de convertir-la en una pregu
 sis nits seguides a la 01:00 UTC —runs **161, 162, 163, 164, 165 i 166**— totes `SUCCESS` en 11-12
 segons, amb el mirall segellat a les 00:45 i cap correu d'alerta.
 
-⏳ **El que queda de `AE01SAPRDP` no ha canviat**: desactivar-hi la tasca vella i esborrar
-l'`appsettings.Production.json`, que té credencials i ja no fa cap feina. Amb dues màquines amb la
-tasca activa es trepitgen.
+### ✅ `AE01SAPRDP` no s'ha de netejar: desapareix (05/10/2026)
 
-⚠️ **I no es pot fer des de l'equip local.** Comprovat el 05/10/2026: `.239` deixa passar el
-`Test-WSMan` però denega l'`Invoke-Command` i el `schtasks /query /s` a `ohijazo`
-(*Acceso denegado*), al contrari que `.136`, on tots dos funcionen. O sigui que això va per **RDP**
-—`ohijazo` hi té accés des del 16/09— o per Sistemes, perquè la tasca la va crear un administrador.
+Va estar escrit dues setmanes com a pendent —desactivar-hi la tasca vella i esborrar
+l'`appsettings.Production.json`—, i **la resposta és que la màquina es dona de baixa i tot passa a
+`AE02SAPRDP`**. No hi ha res a fer-hi.
+
+Val la pena saber per què no urgia, perquè el raonament es repetirà: **la tasca vella hi segueix
+fallant cada nit i no pot espatllar res.** L'`appsettings.Production.json` d'allà diu
+`CompanyDb: DB_FARINERA_TEST`, que està OFFLINE, així que el `Login` peta i el procés **no arriba a
+escriure al mirall**. Les dues màquines no es trepitgen: una de les dues no funciona.
+
+⚠️ **L'únic que en queda és la credencial, i no és menor:** aquell fitxer porta la contrasenya
+d'`OHijazo`, que **és la mateixa que la de `proceso`** —el compte que ara fa anar el pipeline—, o
+sigui que és viva. Quan la màquina es retiri, que el disc no acabi en una còpia de la VM; i si hi
+acaba, rotar-la (i llavors toca tocar els dos llocs de §*El pipeline ja no corre amb l'usuari d'una
+persona* i el `.env` de `preparacioComandesVendaSAP`).
+
+> **De passada, una cosa comprovada el 05/10/2026 que convé no oblidar:** `.239` deixa passar el
+> `Test-WSMan` però denega l'`Invoke-Command` i el `schtasks /query /s` a `ohijazo`
+> (*Acceso denegado*), al contrari que `.136`, on tots dos funcionen. Si algun dia s'hagués hagut de
+> tocar aquella màquina, hauria estat per RDP o per Sistemes.
 
 ### Les famílies: el problema dels 782 articles no existia (16/09/2026)
 

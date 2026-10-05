@@ -161,9 +161,11 @@ P:\GAPI07_Analitza\
       **desactivada** i no havia corregut mai. Sis nits seguides desateses del 30/09 al 05/10 (runs
       161-166, `SUCCESS` en ~11 s). Diagnòstic de la màquina amb `deploy\Check-WorkerHost.ps1`; els
       passos, a `deploy/README.md`
-- [ ] **Netejar `AE01SAPRDP`**: desactivar-hi la tasca vella i esborrar l'`appsettings.Production.json`,
-      que té credencials i ja no fa cap feina. **No es pot des de l'equip local**: `.239` denega WinRM
-      i `schtasks` (05/10/2026), així que va per RDP o per Sistemes
+- [x] ~~Netejar `AE01SAPRDP`~~ — **no cal: la màquina desapareix i tot passa a `AE02SAPRDP`**
+      (decidit el 05/10/2026). ⚠️ L'únic que queda d'allà és que
+      `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json` **porta una contrasenya que encara es
+      fa servir** (la d'`OHijazo`, que és la mateixa que la de `proceso`): val la pena que el disc no
+      sobrevisqui en una còpia de la VM, o rotar-la
 - [ ] Rebre resposta sobre el compte SMTP per a Database Mail
 - [ ] Passar-los la IP d'Analitza perquè obrin el firewall al port 1433, quan l'Adrià la doni
 
