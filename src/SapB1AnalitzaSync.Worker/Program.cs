@@ -54,10 +54,26 @@ Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
 var log = host.Services.GetRequiredService<ILogger<Program>>();
 
-if (string.IsNullOrWhiteSpace(slOptions.BaseUrl) || slOptions.BaseUrl.Contains('<'))
+// La guarda cobria només BaseUrl, i deixava fora precisament la clau que canvia
+// al cutover. Sense això, una CompanyDb oblidada arriba al Login i torna
+// "Invalid login credential", que envia qui ho depuri a mirar la contrasenya.
+// Això NO detecta apuntar a una companyia existent però equivocada: cap guarda
+// ho fa, i és per això que el primer cicle contra una companyia nova es fa a mà
+// i es comparen els recomptes (veure docs/runbook_cutover.md).
+foreach (var (key, value) in new[]
+         {
+             ("ServiceLayer:BaseUrl", slOptions.BaseUrl),
+             ("ServiceLayer:CompanyDb", slOptions.CompanyDb),
+             ("ServiceLayer:UserName", slOptions.UserName),
+             ("ServiceLayer:Password", slOptions.Password),
+         })
 {
-    log.LogError("ServiceLayer:BaseUrl no està configurat. A DEV: dotnet user-secrets set \"ServiceLayer:BaseUrl\" \"https://...:50000/b1s/v1/\" " +
-                 "i executa amb DOTNET_ENVIRONMENT=Development (els user-secrets només es carreguen en Development).");
+    if (!string.IsNullOrWhiteSpace(value) && !value.Contains('<')) continue;
+
+    log.LogError("{Key} no està configurat (és buit o encara porta el placeholder). A DEV: " +
+                 "dotnet user-secrets set \"{Key}\" \"...\" i executa amb DOTNET_ENVIRONMENT=Development " +
+                 "(els user-secrets només es carreguen en Development). A PRD: appsettings.Production.json " +
+                 "al costat de l'executable.", key, key);
     return 3;
 }
 

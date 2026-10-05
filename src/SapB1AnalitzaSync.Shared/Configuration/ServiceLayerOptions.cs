@@ -12,7 +12,7 @@ public sealed class ServiceLayerOptions
 
     /// <summary>
     /// Companyia de SAP. AQUESTA és la clau que canvia al cutover de Novembre
-    /// 2026 (DB_FARINERA_TEST → DB_FARINERA_PROD). Ja no és cfg.settings.SBO_DB.
+    /// 2026 (DB_FARIN_TEST → DB_FARINERA_PROD). Ja no és cfg.settings.SBO_DB.
     /// </summary>
     public string CompanyDb { get; set; } = string.Empty;
 

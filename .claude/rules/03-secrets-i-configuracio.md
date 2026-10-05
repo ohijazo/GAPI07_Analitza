@@ -6,7 +6,9 @@
 - ✅ A `appsettings.json` hi van **només placeholders** de la forma `<from-secrets-manager>`,
   `<sap-host>`, `<sql-host>`. Si hi veus un valor que sembla real, és un bug.
 - ✅ **DEV**: `dotnet user-secrets` (viuen a `%APPDATA%\Microsoft\UserSecrets`, fora del repo).
-- ✅ **PRD**: variables d'entorn de màquina del compte de servei.
+- ✅ **PRD**: per al Worker d'`AE02SAPRDP`, `appsettings.Production.json` al costat de l'executable,
+  protegit per permisos NTFS. **No** variables d'entorn de màquina: aquella màquina allotja
+  webservices de tercers que les podrien llegir. El detall és a `deploy/README.md`, secció 3.
 
 `.gitignore` ja bloqueja `**/secrets.json`, `.env` i els fitxers de cookies de SL. Abans de
 commitejar res que faci olor de config, comprova que segueix cobert.

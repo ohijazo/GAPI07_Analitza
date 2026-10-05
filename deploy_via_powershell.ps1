@@ -9,6 +9,11 @@
 # qui munti la productiva al novembre fara servir AQUEST fitxer: si tornen a
 # divergir, la que quedara mal desplegada es la productiva.
 #
+# NO inclou res de sql/migrations/. Aquella carpeta son canvis de DADES sobre
+# estat que no es pot regenerar (cfg.client_ship_no), s'executen a MA una sola
+# vegada i mirant la sortida: un desplegament rutinari no ha de poder reassignar
+# ~800 id_client_location. schema/04_migracions.sql = esquema idempotent i
+# automatic; sql/migrations/*.sql = dades, un sol cop, amb permis explicit.
 # NO inclou schema\01_create_database.sql: fa DROP de les vuit dbo.est_* i es
 # creacio inicial, no desplegament. Els canvis d'esquema sobre una BD viva van a
 # schema\04_migracions.sql, que si que hi es.
