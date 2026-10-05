@@ -887,6 +887,14 @@ a §6.5b; aquí el que en queda obert.
 
 ### ✅ L'Adrià contesta el 05/10/2026, i tanca tres dels quatre punts
 
+> ✅ **`resposta_adria_5.docx` enviat el mateix 05/10/2026.** Hi espera **cinc** coses, i la primera és
+> la que pot espatllar el dia del tall: **el `product_cost`** (tres sortides, la tria és seva), **que
+> no hi posi un `REPLACE` del `DESHABILITAT__`**, el «sí» del **`discount`**, si tenen **documents de
+> 100+ línies**, i **magatzem i previsions**, que ja fa dos correus que no contesta.
+>
+> El correu va amb **tres punts numerats i prou** a propòsit: les dues vegades que el `/100` va anar
+> dins d'una llista de cinc preguntes, va contestar la resta i es va saltar aquella.
+
 | Punt | Com queda |
 |---|---|
 | 1. El mapatge `id_antic → id_nou` | ✅ **No el necessita, i per un motiu que val més que el mapatge**: encara **no ha carregat res a producció**. Va refinant les SQL i el dia del tall «farem un swap amb la nova configuració/sql's i a partir de llavors es començarà a importar a producció». La hipòtesi de l'01/10 era bona |
