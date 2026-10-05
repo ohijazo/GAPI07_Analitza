@@ -3,7 +3,7 @@
 > Visió executiva completa: què és, com funciona, què s'ha decidit i per què, què s'ha
 > trobat pel camí i què queda obert.
 >
-> Última actualització: **16/09/2026**
+> Última actualització: **05/10/2026**
 
 ---
 
@@ -210,7 +210,7 @@ Això és el que no es pot trencar. Està recollit a `.claude/rules/04-contracte
 | Check `vanished_ids` | ✅ desplegat 26/08 |
 | Login `analitza_ro`, només lectura, amb `DENY CONNECT` a `DB_FARINERA_TEST` i `SBO-COMMON` | des del principi |
 
-**El Worker corre a `AE01SAPRDP`, no al servidor de SQL.** El job de SQL Agent apuntava a
+**El Worker corre a `AE02SAPRDP`, no al servidor de SQL.** El job de SQL Agent apuntava a
 `P:\GAPI07_Analitza\...`, i `P:` és una unitat de xarxa mapada a una carpeta personal: SQL Agent
 corre com a `SYSTEM`, no la veu, i el pas fallava amb *"The process could not be created"*.
 
@@ -228,9 +228,11 @@ La guarda va caçar alguna cosa real la primera vegada que es va provar (26/08/2
 **24 hores** i les verificacions d'aquell matí anaven sobre dades del dia anterior. A test no es
 notava perquè no havia canviat res.
 
-✅ **Desplegat i corrent des del 16/09/2026.** El Worker és a `C:\Apps\SapB1AnalitzaSync`
-d'`AE01SAPRDP` i la tasca **`GAPI07 Refresca sap_raw`** el llança cada dia a les **02:45** amb
-`AGRIENERGIA\sapsistema`.
+🔴 **Desplegat i corrent del 16/09 al 21/09/2026 a `AE01SAPRDP`; des del 22/09 el servidor és
+`AE02SAPRDP` (192.168.11.136) i el cicle nocturn NO corre.** El Worker ha d'anar a
+`C:\Apps\SapB1AnalitzaSync` de la màquina nova, amb la tasca **`GAPI07 Refresca sap_raw`** cada dia
+a les **02:45** amb `AGRIENERGIA\sapsistema`. Estat i passos a la secció 9, *El Worker canvia de
+servidor*, i a `deploy/README.md`.
 
 ✅ **I el 17/09/2026 el pipeline va publicar per primera vegada des del 24/08** — run **139**,
 `SUCCESS`. Veure *La primera publicació* més avall: va costar dos runs fallits, i cap dels dos era
@@ -266,7 +268,7 @@ llavors és avisar-los, **no** apujar `MIRROR_MAX_AGE_HOURS`.
 
 | Compte | Per a què | Qui |
 |---|---|---|
-| Windows (`AGRIENERGIA\sapsistema`) | Executar la tasca a `AE01SAPRDP`. ✅ **Ja existeix** (16/09/2026). El nom `svc_gapi07` que surt als correus del 07 i 10/09 era la nostra proposta, no el compte real | Sistemes |
+| Windows (`AGRIENERGIA\sapsistema`) | Executar la tasca a `AE02SAPRDP`. El compte existeix des del 16/09/2026, però **a la màquina nova li cal el dret *Log on as a batch job*, que no s'hereta**. El nom `svc_gapi07` que surt als correus del 07 i 10/09 era la nostra proposta, no el compte real | Sistemes |
 | SAP Service Layer (`GAPI07_RO`) | Llegir SAP. Ara va amb `OHijazo`, nominal | Oscar |
 | SQL Server (`gapi07_worker`) | Escriure a `sap_raw`. En local encara va amb `sa` | Oscar — `sql/security/Create-WorkerUser.ps1` |
 | SQL Server (`gapi07_etl`) | Context del pas del job. **Sense login**: no s'hi connecta ningú, només s'impersona | Oscar — `sql/security/create_etl_user.sql`, 31/08/2026 |
@@ -276,7 +278,7 @@ de SAP consumeix llicència**. Si no n'hi ha cap de lliure, no es pot crear i ca
 partner. Per al de SQL hi ha un llançador que demana la contrasenya interactivament i no l'escriu
 enlloc.
 
-**`AE01SAPRDP` allotja webservices de col·laboradors externs.** Per això la configuració no va a
+**`AE02SAPRDP` allotja webservices de col·laboradors externs.** Per això la configuració no va a
 variables d'entorn de màquina —qualsevol procés de la màquina les llegiria— sinó a un
 `appsettings.Production.json` al costat de l'executable, amb els permisos NTFS tancats al compte de
 la tasca.
@@ -574,6 +576,11 @@ mou (les mateixes 5.647 diferències contra `baseline` que abans del canvi).
 
 ### 6.5 El número d'adreça tampoc era el de KAIS (28\08\2026)
 
+> ⚠️ **SUPERAT EL 29/09/2026 — veure §6.5b.** La conclusió d'aquesta secció
+> (renumerar 0,1,2… per `LineNum`) era la SEGONA hipòtesi de tres, i també era falsa. El número
+> de KAIS viu al prefix `NNN-` del nom de l'adreça de SAP. Es deixa sencera perquè la seqüència
+> dels tres errors és el que impedeix tornar-hi.
+
 `id_client_location` té dues meitats i el `U_FCCodiKais` només arregla l'esquerra. En comparar la
 sortida sencera contra l'exportació d'Analitza va sortir que **la dreta també estava trencada**:
 
@@ -616,6 +623,87 @@ lliure i no el buit.
 
 ⚠️ **`cfg.client_ship_no` no és una taula derivada**: és estat que no es pot regenerar. Si es perd,
 tots els números es recalculen. Ha d'entrar al backup i no l'ha de truncar ningú.
+
+### 6.5b El número d'adreça, tercera iteració: era al nom de l'adreça de SAP (29\09\2026)
+
+⚠️ **El que diu la secció 6.5 està superat, i val la pena llegir les dues seguides**: és la tercera
+vegada que aquest número es dona per resolt, i cada vegada la mesura semblava tancar el tema.
+
+La comparativa que l'Adrià va enviar el **25/09/2026** (`comparativa farinera 25-09-26.txt`) marcava
+5.088 de 5.651 `client_locations` com a modificats. Ell ho atribuïa a una neteja de dades, i la major
+part ho era. Però a sota hi havia **804 ubicacions apuntant a l'adreça equivocada**.
+
+**El número de KAIS viu al PREFIX del nom de l'adreça de SAP**, `CRD1.Address`, on el va deixar la
+migració KAIS→SAP amb el format `NNN-<nom del client>-<abreviatura de ciutat>`:
+
+```
+C251271 / LineNum 4    '000-CREATIVE FOODING SL-BARCELONA'   ship_no congelat 0   OK
+C251271 / LineNum 12   '002-CREATIVE FOODING SL-BARCELONA'   ship_no congelat 1   MAL
+C251271 / LineNum 14   '001-CREATIVE FOODING SL-BARCELONA'   ship_no congelat 2   MAL
+```
+
+Renumerar 0,1,2… per `LineNum` no era un desplaçament: era una **permutació**. Per a Analitza això no
+és un forat, és l'històric d'una adreça sobre una altra — exactament el dany que `cfg.client_ship_no`
+existeix per evitar.
+
+#### Els tres mesuraments, i per què cada un va enganyar
+
+| Quan | Contra què | Resultat | Per què era fals |
+|---|---|---|---|
+| Fase 0 | `baseline.est_clients` | 534/534 (100%) | `baseline` és sortida del pipeline antic ja apuntat a SAP: comparava SAP amb SAP |
+| 28/08 | l'exportació d'Analitza, **per client** | 4.647/4.689 (99,1%) | Es mesurava per CLIENT, i la majoria en tenen **una sola adreça**: quadren amb qualsevol regla |
+| 29/09 | l'exportació d'Analitza, **per adreça** | 4.923/5.618 (87,6%) | — aquest és el bo |
+
+Amb el prefix: **5.574 de 5.618 (99,2%)**. I mirant només les 804 que van canviar de número, el codi
+postal de KAIS quadrava amb el de SAP en **132** i després en **786**. El residu són adreces que a
+KAIS no tenien codi postal, zeros al davant (`080057` contra `80057`) i una adreça que a SAP ha
+canviat de ciutat.
+
+**La lliçó no és «`baseline` enganya» —això ja ho sabíem— sinó que el 99,1% del 28/08 era el mateix
+error amb una cara nova: un percentatge alt sobre el denominador equivocat.** El dany vivia només als
+clients amb diverses adreces, i mesurant per client quedaven diluïts fins a desaparèixer.
+
+#### Què es va fer
+
+| | |
+|---|---|
+| `etl.vw_client_ship_kais_no` | La regla del prefix en un sol lloc, com `vw_client_code`. Tolera la cometa inicial de l'escapament CSV de SAP, que amagava **5** adreces del patró |
+| `sql\migrations\2026-09-29_ship_no_from_address_prefix.sql` | La re-congelació. **Fora de `deploy.sql` a propòsit** |
+| `etl.sp_assign_client_ship_no` | Les adreces noves prenen el prefix si el número és lliure; si no, `MAX+1` |
+| Checks 15 i 16 | `ship_no_prefix_mismatch` i `master_name_artifacts` |
+| `tools\Import-AnalitzaClientExport.ps1` + `cfg.analitza_client_export` | El cens de KAIS dins de la BD, i `sql\verify_ship_no.sql` per repetir la mesura |
+
+**La regla, i la seva excepció:** cada adreça pren el seu prefix; si un client té dues adreces amb el
+**mateix** prefix (la mateixa adreça introduïda dues vegades a SAP), aquell client es queda **enter**
+com estava. Són tres: `C221503`, `C291071` i `C432068`. No s'inventa cap desempat, perquè un número
+que no es pot justificar contra KAIS és pitjor que no canviar res. Amb això, **0 col·lisions**.
+
+#### Per què va ser barat, i per què no ho hauria estat al novembre
+
+**Només 8 `id_client_location` desapareixen** de 804 files canviades: gairebé tot són permutacions
+dins del mateix conjunt de números d'un client, i una permutació no fa desaparèixer cap identificador.
+O sigui que `vanished_ids` ho va veure com un **WARN de 8 sobre un llindar de 10** i
+**`ID_DROP_MAX` no es va tocar**.
+
+El corol·lari incòmode: **el que es movia era el contingut de 804 ubicacions, no la seva existència**,
+i això cap check nostre no ho pot veure. Per això la verificació ha de ser contra el cens d'Analitza.
+
+⚠️ **I per què no es podia ajornar:** `cfg.client_ship_no` és **la mateixa taula per a test i per a
+productiva** —el cutover és un canvi de `ServiceLayer:CompanyDb`, no una BD nova—. Els números
+corregits el 29/09 són literalment els que farà servir la productiva el 2 de novembre. I sense el
+canvi a `sp_assign_client_ship_no`, les adreces que a test no hi són i a la productiva sí (§6.6: 45
+dels 63 locations perduts) haurien arribat el dia 2 com a adreces noves, amb un `MAX+1` inventat.
+
+**Run 160, `SUCCESS`**: 804 files renumerades, `vanished_ids` WARN amb 8, `ship_no_prefix_mismatch`
+WARN amb 4 = el `SHIP_NO_PREFIX_BASELINE` que la migració va armar, i `lines_orphan_client` a **0**
+—el gate real, i va caldre `@ForceFullLines=1` als dos runs—.
+
+⏳ **Queda una conseqüència que decideix Analitza.** Pel que l'Adrià va explicar l'01/09, quan els
+deixa d'arribar un `client_location` l'esborren però **mantenen l'històric d'albarans**. O sigui que la
+renumeració li deixa l'històric enganxat al número antic i el nou buit: **li desplaça l'històric de
+804 ubicacions**. El mapatge `id_antic → id_nou` és a `audit.client_ship_no_changes` amb els ids ja
+construïts, i `resposta_adria_4.docx` li ho ofereix. Si ja havia ingerit dades d'aquest origen, el
+necessita; si no, no.
 
 ### 6.6 Resultat de la implementació del COALESCE (28\08\2026)
 
@@ -788,7 +876,171 @@ desajust: `etl_runs.started_at` guarda **UTC** i a l'agost anem a UTC+2.
 
 ## 9. Què queda obert
 
+### ✅ La validació d'Analitza troba el número d'adreça equivocat (25-29/09/2026)
+
+L'Adrià va enviar `comparativa farinera 25-09-26.txt`, la **primera validació de debò contra el cens
+de KAIS** d'aquest projecte, i en una tarda va destapar el que quatre setmanes de checks no havien
+vist: **804 ubicacions apuntaven a l'adreça equivocada**. El detall tècnic i els tres mesuraments són
+a §6.5b; aquí el que en queda obert.
+
+**Corregit i publicat el 29/09/2026** (run 160 `SUCCESS`). ✅ **`resposta_adria_4.docx` enviat l'01/10/2026.**
+
+### ✅ L'Adrià contesta el 05/10/2026, i tanca tres dels quatre punts
+
+| Punt | Com queda |
+|---|---|
+| 1. El mapatge `id_antic → id_nou` | ✅ **No el necessita, i per un motiu que val més que el mapatge**: encara **no ha carregat res a producció**. Va refinant les SQL i el dia del tall «farem un swap amb la nova configuració/sql's i a partir de llavors es començarà a importar a producció». La hipòtesi de l'01/10 era bona |
+| 2. Repetir la comparativa | ✅ **Feta** (`comparativa farinera 05-10-26.txt`). Les xifres, més avall |
+| 3. **El `/100`** | ✅ **TANCAT, i amb el codi al davant.** Veure sota |
+| 4. Magatzem i previsions (per a en Lluís) | ⏳ **No el contesta.** És l'únic que queda obert d'aquest correu |
+
+**El `/100` era l'únic punt del contracte que el dia del tall fallava en silenci**, i portava obert des
+del 31/08/2026 i tres correus. Els canvis que ja té provats i que posarà a producció el dia del tall:
+
+```sql
+-- a invoice_lines
+product_price/100 -> product_price
+product_cost/100  -> product_cost
+AND date >= '2026-11-02'
+```
+
+Tres conseqüències, i la tercera no l'havíem previst:
+
+1. **Els preus van en euros tal com els emetem, i nosaltres no hem de fer res.** Important: **no
+   multiplicar per 100 "per si de cas"** — les dues correccions alhora tornarien a desquadrar-ho.
+2. **Del `discount` no diu res**, així que manté el seu `1 - discount` i la convenció del
+   multiplicador es queda. `DISCOUNT_AS_PERCENT` **no es toca** el dia del tall (§Decisions pendents).
+3. **Filtra `date >= '2026-11-02'`**: no ingerirà cap línia anterior al tall. Encaixa amb el blueprint
+   17.3 (no es migra històric documental), però vol dir que **el que publiquem abans del dia 2 li és
+   invisible**, i que el `product_cost` d'octubre deixa de ser un problema d'ell.
+
+**El que ell arregla al seu costat** (i que ja no és feina nostra): l'escapament CSV de les cometes
+—amb un `CASE` que les treu a `client_locations.name`/`address`, `client_location_attributes` i
+`products.name`—, i **el misteri dels accents**. No era que llegís CP850 com havíem suposat: era un
+`REPLACE(char(160))` seu, heretat de l'intercanvi antic, que s'enduia la `Á` de `RECO DE CAL TOMÁS`.
+L'ha tret de totes les SQL. La nostra lectura d'això era equivocada i val la pena no repetir-la.
+
+> **Les tres claus duplicades que reporta són del seu fitxer de KAIS, no nostres.** `1609777`,
+> `1609882` i `1612956` són ids de 7 dígits; els nostres són `offset + DocEntry*100 + LineNum`. I al
+> nostre costat un duplicat **no pot arribar-hi en silenci**: `est_linies_albara` té
+> `PRIMARY KEY CLUSTERED (id_invoice_line)` a `dbo` i a `staging`, o sigui que petaria la càrrega.
+> Però això descobreix un sostre — veure *El sostre de `LineNum`*, més avall.
+
+⏳ **Netejar a SAP els valors mestres amb escapament CSV de la migració**: 3 `CardName`, 5
+`CRD1.Address`, 25 `ItemName` i 34 `E_Mail`. No trenca res, però una d'aquelles cometes **tapava el
+prefix de cinc adreces** i per això ara hi ha el check `master_name_artifacts`. El dia que algú els
+corregeixi, `ship_address_changed` avisarà per les 5 adreces i serà correcte.
+
+#### La comparativa del 05/10: la correcció es veu, i el que la tapa
+
+Columnes modificades a `client_locations`, 25/09 → 05/10 (5.651 registres nostres contra els 5.703 seus):
+
+| Columna | 25/09 | 05/10 |
+|---|---|---|
+| `address` | 1.279 | **651** |
+| `zip_code` | 673 | **26** |
+| `city` | 614 | **48** |
+| `country_code` | 59 | **1** |
+| `email` | 54 | **3.004** |
+| `phone_number` | 4.873 | 4.879 |
+| `name` · `salesmen_id` · `new_code` | 82 · 157 · 20 | 77 · 157 · 20 |
+
+Registres eliminats 78 → 75, nous 30 → 23. **Les quatre columnes d'adreça s'han ensorrat**, que és
+exactament on havia de notar-se la re-congelació del `ship_no`. El total de modificats, en canvi, puja
+(5.088 → 5.249): la previsió de «l'ordre de 4.300» que es va escriure l'01/10 era optimista, i el que
+se l'emporta és la columna `email`, que no té res a veure amb aquesta feina. Els `phone_number` són
+format (`972.210.901` → `972210901`) i ja hi eren.
+
+### L'scrubbing de la companyia de test, i per què no s'ha de tapar (05/10/2026)
+
+La pregunta que l'Adrià fa al correu del 05/10 és per què 3.000 correus li arriben com a
+`DESHABILITAT__lbutinya@agrienergia.com`, i si ha de fer un `REPLACE`. **La resposta és que no**, i
+`sap_raw.OCRD.UpdateDate` permet datar-ho sense preguntar-ho a ningú:
+
+| | |
+|---|---|
+| Una sola operació del **25/09/2026** va tocar | **4.631 dels 4.691 clients** |
+| … amb `DESHABILITAT__` al davant del correu | **2.253** |
+| … amb el correu buidat | **2.378** |
+| Camps afectats | **només `E_Mail`**: `CardName`, `CRD1.Address` i `ItemName` en tenen 0 |
+| `dbo.est_clients` / `staging.est_clients` | **3.021** ubicacions (quadra amb els seus 3.002) |
+| `baseline.est_clients` | **0** — el 24/08, a l'`DB_FARINERA_TEST` vella, no hi era |
+
+És l'**scrubbing de correus de la companyia de test**, entrat amb la preparació de `DB_FARIN_TEST`, i
+**desapareix sol quan `CompanyDb` apunti a la productiva**. El check `master_name_artifacts` ja el
+separa dels artefactes d'escapament CSV precisament per això: al run 166 són **2.338 = 67 CSV + 2.271
+prefix de test**, i els 67 són els del pendent de dalt (34 `E_Mail` + 25 `ItemName` + 5 `Address` + 3
+`CardName`).
+
+**Dues coses que contesten la seva pregunta amb dades:**
+
+- **No són només clients inactius.** Dels 2.305 clients amb el prefix, **849 estan actius**
+  (`validFor='Y'`) i 1.456 congelats. Qui ho interpretés com una marca de baixa s'equivocaria.
+- **A 26 clients el correu publicat surt tallat.** `sp_load_clients` emet `LEFT(E_Mail, 60)` i el
+  prefix menja 14 caràcters:
+
+  ```
+  SAP:      DESHABILITAT__"farnau@vicensbatllori.com; montse@vicensbatllori.com        "
+  publicat: DESHABILITAT__"farnau@vicensbatllori.com; montse@vicensbatll
+  ```
+
+⚠️ **I per què no se li ha de deixar posar el `REPLACE`:** el prefix a la productiva voldria dir que
+**algú hi ha carregat dades de test**, que és una de les coses més greus que poden passar aquell dia.
+Un `REPLACE` al seu costat taparia justament aquell senyal. És el mateix criteri que amb
+`volume_anomaly`: no es fa callar un check perquè a test molesti.
+
+### El sostre de `LineNum` (05/10/2026)
+
+Les claus duplicades del correu de l'Adrià no són nostres, però fan mirar una cosa que no s'havia
+mirat mai: `id_invoice_line = offset + DocEntry*100 + LineNum` **només reserva dos dígits per al
+`LineNum`**. Un document de **100 línies o més** col·lisiona amb el `DocEntry` següent.
+
+El mode de fallada és el bo —hi ha `PRIMARY KEY CLUSTERED (id_invoice_line)` a `dbo` i a `staging`, o
+sigui que la càrrega peta i no publica duplicats—, però aquella nit Analitza es queda amb les dades
+d'ahir, i la fórmula **és contracte**: no es pot canviar sense parlar-ho amb ells.
+
+A test no es pot mesurar: màxim **7 línies** per albarà, 3 per devolució i 4 per abonament. I la
+productiva arrenca sense històric documental, així que el risc viu als documents que es facin **a
+partir del dia 2**. La consulta és al runbook, pas 4b de la setmana del 27 al 31 d'octubre.
+
+⚠️ **Del document de l'Adrià, dues coses que són de la seva banda i li hem dit:** la seva exportació
+genera cometes duplicades que no són a la BD (8 de les 10 diferències de `name` a `products`), i
+**perd la `Á` majúscula** en llegir CP850 —`RECO DE CAL TOMÁS` arriba bé i al seu fitxer surt `TOM S`—.
+Les dues tapaven diferències de veritat.
+
+
+### ✅ El pipeline ja no corre amb l'usuari d'una persona (05/10/2026)
+
+**El Worker va amb `proceso`**, el compte que el partner va crear per a processos no concurrents
+(§Llicenciament, i `docs/llicencies_service_layer.md`). La contrasenya és la mateixa que la d'`OHijazo`,
+així que el canvi és **una sola clau** a dos llocs i no s'ha hagut de comprar cap llicència:
+
+| On | Fet |
+|---|---|
+| user-secrets de l'equip de desenvolupament | `dotnet user-secrets set "ServiceLayer:UserName" "proceso"` |
+| `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json` a `AE02SAPRDP` | el valor de `ServiceLayer:UserName`, deixant la resta del fitxer byte a byte igual (581 → 581 bytes) |
+
+**Verificat pel camí real, no pel que s'hi assembla** (la lliçó del 16/09): `--once` llançat **a la
+màquina de producció**, amb la seva configuració, surt amb `0`, al log hi diu
+`Login a Service Layer ... (CompanyDB=DB_FARIN_TEST, usuari=proceso)` i `sap_raw.sync_state` queda
+segellat amb les **nou entitats** a les 13:40 UTC. Codi de sortida **i** dada escrita.
+
+> **`AE02SAPRDP` accepta WinRM per a `ohijazo`**, i això estalvia molta feina: el fitxer de
+> configuració —que no és al repositori i no el toca cap desplegament— es pot editar des de l'equip
+> local amb `Invoke-Command`, **sense passar per RDP i sense tocar la contrasenya**, canviant només la
+> clau que calgui. `AE01SAPRDP` **no**: denega WinRM i `schtasks` (comprovat el 05/10/2026), i per això
+> la neteja de la màquina vella segueix pendent.
+
+⏳ **El que queda d'això** és preguntar a en Carles **a quina hora corren GAPI01 i GAPI09**, que
+comparteixen el mateix compte. Compartir no vol dir «no coincidir en l'execució» sinó **que les
+sessions no se solapin**: nosaltres treballem 20 segons a les 02:45 i fem `Logout`, així que alliberem
+de seguida, però d'ells no ho sabem. I queda treure `OHijazo` dels altres tres projectes.
+
 ### Llicenciament de SAP — obert, i més gran del que sembla
+
+> ✅ **La part que bloquejava GAPI07 està resolta des del 05/10/2026**: el pipeline va amb `proceso` i
+> no ha calgut cap llicència nova. El que segueix obert és la pregunta gran, la del consum indirecte
+> d'Analitza CM, i treure `OHijazo` dels altres tres projectes.
 
 **27/08/2026.** Per crear un usuari tècnic de Service Layer cal una llicència, i a
 *Gestió → Llicència → Administració de llicències* **no n'hi ha cap de lliure**:
@@ -889,8 +1141,230 @@ viu aquí. El FULL de les 22:00 la cobreix, i l'exposició màxima és d'un dia,
 regenera sola» ja no descriu tota la base de dades.
 
 > **De passada**: el 15/09/2026 va aparèixer una `DB_FARINERA_TEST2` a les còpies, de 790 MB. No és
-> nostra i ningú ens ha dit res. Pot ser la pista de qui està preparant un refresc de
-> `DB_FARINERA_TEST`, que és una altra pregunta que portem oberta des del 07/09.
+> nostra i ningú ens havia dit res. ✅ **Contestat el 22/09/2026**: era la preparació de
+> `DB_FARIN_TEST`, la companyia de test nova. La hipòtesi era bona i la via —mirar `backupset` en
+> comptes de preguntar— va tornar a funcionar, però el que faltava (que la BD canviava de nom) no
+> es podia deduir de les còpies. Veure §5, *La companyia de test canvia de nom*.
+
+### La companyia de test canvia de nom (22/09/2026)
+
+Per correu: la BD de test passa a ser **`DB_FARIN_TEST`**, restaurada a partir de
+`DB_FARINERA_TEST` i amb les mateixes dades. La vella es donarà de baixa (data no dita).
+
+El canvi funcional és una clau, `ServiceLayer:CompanyDb`, i ni un SP ni una vista ni un test la
+coneixen. Però **tres coses no es veien des del correu**:
+
+1. **Un forat de la Regla 01.** `ohijazo_sql`, `gapi07_worker` i `analitza_ro` tenien `DENY CONNECT`
+   sobre `DB_FARINERA_TEST` i **cap denegació sobre la companyia nova**. La llista de BD de SAP
+   estava escrita a mà a quatre scripts; ara viu en una variable a dalt de cada fitxer i els blocs
+   van guardats amb `DB_ID(...) IS NOT NULL`, perquè segueixin sent idempotents el dia de la baixa.
+
+2. **El mirall no sap de quina companyia ve.** `sap_raw.sync_state` té com a clau només l'entitat.
+   Canviar de companyia deixa els cursors vius i el Worker continua en incremental. L'única guarda
+   que hi ha és de **frescor** (`ABORTED_STALE_MIRROR`), no de procedència: un mirall fresc de la
+   companyia equivocada hi passa sense immutar-se. Per això el primer cicle es va fer amb el
+   checkpoint buidat.
+
+3. **Al cutover això mateix és molt pitjor, i el runbook no ho deia.** Aquí no fa mal perquè la
+   còpia és la mateixa; contra `DB_FARINERA_PROD` no ho serà. Afegit el pas **2.1b** al runbook:
+   `DELETE FROM sap_raw.sync_state` **i** `TRUNCATE` de les sis taules de documents, perquè
+   `ReplaceDocumentsAsync` només esborra els `DocEntry` del lot que baixa i productiva no tornarà
+   mai els de test.
+
+**Dos bugs latents trobats pel camí**, tots dos del mateix tipus que ja té secció pròpia (§8):
+
+- **`Create-AdminUser.ps1` donava un verd fals sobre la Regla 01.** La comprovació de «pot entrar a
+  la BD de SAP?» construïa la connexió amb `$connStr`, una variable que **no s'assigna enlloc de
+  l'script**: la connexió es feia amb una cadena buida, petava sempre, requeia al `catch` i escrivia
+  `no (correcte)` tant si el `DENY` hi era com si no. Ara va per `New-SqlConn`, amb la credencial de
+  debò, i comprova totes les BD de la llista. El mateix `$connStr` s'oferia a escriure als
+  user-secrets del Worker.
+- **`create_worker_user.sql` encara feia `DENY CONNECT` a `master`.** És exactament el que va
+  costar la tarda del 16/09/2026 (error 916, vint dies latent). `Create-WorkerUser.ps1` ja ho havia
+  corregit i el `.sql` germà s'hi havia quedat enrere: qui executés el `.sql` en comptes del `.ps1`
+  tornava a plantar el parany. Ara el `.sql` fa `DROP USER` a `master`, com el `.ps1`.
+
+**I dues coses que només es van veure mirant `sys.databases`, no al correu:**
+
+- **`DB_FARINERA_TEST` ja estava OFFLINE** el mateix 22/09, a les poques hores de crear-se
+  `DB_FARIN_TEST` (11:18). O sigui que la baixa no és una cosa que passarà: ja ha passat. Això va
+  obligar a afinar la guarda dels scripts: **`DB_ID()` retorna un id per a una base de dades
+  OFFLINE**, així que `IF DB_ID(@db) IS NULL` no la salta i el `USE` peta igualment. La comprovació
+  bona és `sys.databases.state_desc = 'ONLINE'`.
+- ⚠️ **Hi ha una `DB_FARINERA` sense sufix, ONLINE des del 13/03/2026, i no hi ha cap
+  `DB_FARINERA_PROD`.** Tota la documentació d'aquest projecte —runbook inclòs— dona per fet que la
+  companyia productiva es dirà `DB_FARINERA_PROD`. **Al servidor no existeix cap BD amb aquest nom.**
+  Si la productiva és `DB_FARINERA`, el pas 2.1 del runbook posaria un nom que no existeix i el
+  Worker petaria amb `Invalid login credential` el dia del tall. S'ha afegit `DB_FARINERA` a les
+  llistes de `DENY CONNECT` (hi va pel mateix motiu que la resta), però **quin és el nom de la
+  companyia productiva s'ha de confirmar, no deduir del nom del fitxer**.
+
+**Feina que no és nostra però que se'n deriva**: `P:\preparacioComandesVendaSAP\.env` porta
+`SAP_SL_COMPANY=DB_FARINERA_TEST` i `SAP_SQL_DATABASE=DB_FARINERA_TEST`. És l'altre projecte, el
+que **sí que escriu a SAP**, i el dia que donin de baixa la BD vella s'aturarà. Avisat.
+
+### 🔴 El Worker canvia de servidor i el cicle nocturn s'atura (22–25/09/2026)
+
+**`sap_raw` no es refresca sol des de la nit del 21 al 22/09.** Tres nits seguides de correu d'alerta
+a les 03:00:
+
+| Run | Quan (UTC) | Estat |
+|---|---|---|
+| 147 | 22/09 01:00 | `SUCCESS` — **l'últim cicle nocturn bo** |
+| 148 | 22/09 12:26 | `SUCCESS_NOSWAP` — `--once` + `@SkipSwap=1` a mà |
+| 149 | 23/09 01:00 | `ABORTED_STALE_MIRROR` — mirall de 13 h |
+| 150 | 23/09 06:10 | `SUCCESS` — `--once` a mà des de l'equip local |
+| 151 | 24/09 01:00 | `ABORTED_STALE_MIRROR` — mirall de 19 h |
+| 152 | 25/09 01:00 | `ABORTED_STALE_MIRROR` — mirall de 48 h |
+
+Els `SUCCESS` del mig són execucions manuals, no la tasca. `sap_raw.sync_state` porta les nou
+entitats segellades el **23/09 a les 06:09 UTC** i no s'ha mogut des de llavors.
+
+**No és una avaria de l'ETL**, i val la pena dir-ho perquè el correu del SQL Agent diu `STATUS:
+Failed` i convida a pensar-ho: és la guarda `MIRROR_MAX_AGE_HOURS` avortant abans de tocar
+`staging`, i per això `DURATION` són 0 segons. `dbo.est_*` es queda amb dades bones del 23/09 en
+comptes de publicar-ne de mig carregades. **No s'ha d'apujar el llindar per fer callar l'avís.**
+
+**La causa: el Worker ha canviat de màquina.** De `AE01SAPRDP` (192.168.11.239) a **`AE02SAPRDP`
+(192.168.11.136)**, verificat per DNS el 24/09. Totes dues responen a 445 i 3389; `C$` està denegat
+des de fora a totes dues —i és així a propòsit—, o sigui que **l'estat de la instal·lació no es pot
+veure sense entrar-hi per RDP**.
+
+⚠️ **Dos canvis la mateixa setmana, i des de SQL no es distingeixen.** El canvi de servidor i el
+canvi de nom de la companyia (secció anterior) tenen exactament el mateix símptoma: el mirall es fa
+vell. Sigui quin sigui el que ho hagi provocat, **el segon és una mina que queda armada**: si
+l'`appsettings.Production.json` es copia de la màquina vella a la nova, arrossega
+`CompanyDb: DB_FARINERA_TEST`, que està OFFLINE, i el `Login` respon `Invalid login credential` —un
+missatge que apunta a la contrasenya—. La guarda d'arrencada de `Program.cs` només detecta buit o
+placeholder, **no** una companyia existent però equivocada.
+
+**El que un canvi de màquina trenca i que no deixa rastre enlloc**, per ordre de probabilitat:
+
+1. **El dret *Log on as a batch job***. A `AE01SAPRDP` estava concedit per **directiva local, no per
+   GPO**: en una màquina nova no hi és. La tasca es registra igual i falla cada nit amb `0x4`.
+2. **La sortida cap a `192.168.11.238`, ports 50000 i 1433.** El `Test-NetConnection` del 16/09 es va
+   fer des de `.239`. Des de `.136` **no ho ha comprovat ningú**, i aquell resultat no s'hereta.
+3. **L'`appsettings.Production.json`**, que s'ha de recrear **a mà**: els binaris poden viatjar, la
+   configuració no.
+4. **La tasca vella de `AE01SAPRDP`**, si encara hi és: o es desactiva, o les dues màquines es
+   trepitgen.
+
+✅ **De SQL Server no s'ha de tocar res.** `gapi07_worker` és un login SQL i no està lligat a cap
+host; les mencions a `AE01SAPRDP` de `sql/security/*` són comentaris. Comprovat el 24/09/2026.
+
+**S'ha escrit `deploy\Check-WorkerHost.ps1`** perquè això no torni a ser una tarda de conjectures:
+es llança per RDP a la màquina i contesta els set punts d'un sol tret —binaris, `CompanyDb`, ACL,
+tasca i `LastTaskResult`, sortida cap a `.238`, i el dret de batch—. No escriu res, no toca SAP i no
+imprimeix cap contrasenya; el que necessita administrador surt com a `NO COMPROVABLE` en comptes de
+petar.
+
+**La lliçó, que és la de sempre en aquest projecte i ara amb una variant nova:** editar
+`deploy/README.md` **documenta** un canvi, no el desplega. El fitxer que decideix què passa cada nit
+—`C:\Apps\SapB1AnalitzaSync\appsettings.Production.json`— **no és al repositori i no el toca cap
+desplegament nostre**. Quan el 22/09 la companyia va canviar de nom es van actualitzar els documents
+i el codi, i la única còpia que importava es va quedar com estava.
+
+#### Com va quedar (25/09/2026, matí)
+
+**Eren dues causes, no una, i totes dues confirmades.** L'`appsettings.Production.json` de
+`AE01SAPRDP` deia `CompanyDb: DB_FARINERA_TEST`: encara que el servidor no hagués canviat, aquella
+màquina hauria fallat cada nit des del 22/09 igualment.
+
+L'estat real de `AE02SAPRDP`, mesurat amb `Check-WorkerHost.ps1`, era **millor del que es temia**:
+carpeta i ACL ja fetes per Sistemes, i **la sortida cap a `192.168.11.238` pels ports 50000 i 1433
+ja oberta** —el risc número 2 de la llista, tancat sense demanar res—. El que faltava eren els
+binaris i la configuració, que són nostres.
+
+| Fet el 25/09 | |
+|---|---|
+| `publish` refet | Build Release 0 warnings, 28/28 tests. El del 16/09 **no portava** la guarda d'arrencada que cobreix `CompanyDb` |
+| Binaris copiats | 253 fitxers, self-contained `win-x64`: la màquina nova no necessita cap runtime |
+| Configuració | `Set-ProductionConfig.ps1`, escrita **a la màquina**, amb `DB_FARIN_TEST` |
+| Prova de SQL | `gapi07_worker` connecta des de `.136` — credencial i port 1433, verificats alhora |
+| `--once` | 20 s, nou entitats, mirall segellat a les 07:07 UTC |
+| Run 153 | `SUCCESS`, swap fet. 5.651 clients, 2.029 productes, **134 línies** (eren 124), 13 famílies |
+
+Els tres WARN del run 153: `volume_anomaly` (el de sempre a test, 0 línies un dia), `new_code_ambiguous`
+(anterior) i `ship_address_changed` —`C301017/35`, un punt final afegit al nom—. Aquest últim és
+justament el check funcionant: distingeix un canvi de nom d'una reutilització de `LineNum`, i et dona
+les dues cadenes per decidir-ho.
+
+⚠️ **La contrasenya de Service Layer d'`OHijazo` és `1234`**, la mateixa a
+`P:\preparacioComandesVendaSAP\.env`. És un usuari nominal amb permisos amplis i SL escolta a
+`192.168.11.238:50000`. No bloqueja res, però és més gros que el problema que es va venir a resoldre.
+Va amb el pla de treure `OHijazo` de tot arreu quan es reparteixin les llicències.
+
+**Pendent, i és l'únic que decideix si el cicle nocturn torna a córrer:** confirmar amb Sistemes que
+la tasca de les 02:45 existeix i està activada a `AE02SAPRDP`, i que `sapsistema` hi té *Log on as a
+batch job*. El `schtasks` respon `Acceso denegado` i no *no s'ha trobat*, cosa que apunta que la
+tasca ja hi és. Text llest a `peticio_sistemes_ae02saprdp.md`. I queda netejar `AE01SAPRDP`: la tasca
+vella i l'`appsettings.Production.json`, que té credencials i ja no fa cap feina.
+
+#### ✅ Resolt el 28/09/2026: la tasca hi era, i estava DESACTIVADA
+
+Tres nits més d'alerta —runs 154 (18 h), 155 (42 h) i 156 (66 h), tots `ABORTED_STALE_MIRROR`—
+comptades des del `--once` manual del 25/09. `sap_raw.sync_state` no es va moure del **25/09 07:07
+UTC**: la tasca no havia corregut ni una sola vegada.
+
+**I no calia Sistemes per saber-ho.** El `schtasks /query /s AE02SAPRDP` que el 25/09 responia
+`Acceso denegado` ara contesta, i diu exactament què passa:
+
+```
+Estado:                      Deshabilitado
+Hora próxima ejecución:      N/A
+Último tiempo de ejecución:  30/11/1999 0:00:00
+Último resultado:            267011           (0x41303 = mai s'ha executat)
+Tarea que se ejecutará:      C:\Apps\SapB1AnalitzaSync\SapB1AnalitzaSync.Worker.exe --once
+Ejecutar como usuario:       sapsistema
+Tipo / hora:                 Diariamente, 2:45:00
+```
+
+Tot ben configurat —ruta, argument, compte, hora, i creada el 16/09— i **mai arrencada**: es va
+demanar expressament que la registressin **desactivada** perquè no fallés abans que hi hagués els
+fitxers (secció *L'ordre importa: la tasca es registra l'última*), i el 25/09, en acabar el
+desplegament, **no la va activar ningú**. La petició que quedava per enviar preguntava si existia i
+si estava activada; la resposta era *sí* i *no*.
+
+`schtasks /change /enable` + `/run` des de l'equip local: la tasca va córrer a les **11:36:44** amb
+`LastTaskResult = 0` i les nou entitats de `sync_state` resegellades a les **09:37 UTC**
+(`deliverynotes` va passar de 10 files a 18 — el mirall es movia de debò, no és només un codi de
+sortida).
+
+**El cicle nocturn del 29/09 va córrer sol, i és la prova que compta:**
+
+| | |
+|---|---|
+| Tasca a `AE02SAPRDP` | 29/09 **02:45:01**, `LastTaskResult = 0`, pròxima execució 30/09 02:45 |
+| `sap_raw.sync_state` | nou entitats a **00:45 UTC** (mirall de 15 minuts a l'hora del check) |
+| Run 157 | **`SUCCESS` en 11 segons**, swap fet |
+| Warnings | tres, tots `WARN`: `volume_anomaly`, `ship_address_changed`, `new_code_ambiguous` |
+| Correu de les 03:00 | cap |
+
+✅ **I això contesta la pregunta 2 de la petició sense haver-la de fer:** si a `sapsistema` li faltés
+*Log on as a batch job* en aquesta màquina, la tasca hauria tornat `0x4` en comptes de `0`. El dret
+hi és.
+
+**La lliçó, i és una variant nova de la de sempre:** el 25/09 es va donar per fet que el que faltava
+era informació que només tenia Sistemes, i el que faltava era **un canvi d'estat que no havia fet
+ningú perquè cadascú es pensava que el faria l'altre**. Es va demanar la tasca desactivada per una
+raó bona, i «activar-la» no era un pas de cap llista. Quan un pas del desplegament consisteix a
+*desfer* una precaució, ha de sortir escrit al costat de la precaució.
+
+I la segona: **el `Acceso denegado` del 25/09 no volia dir «no ho puc saber mai»**. Val la pena
+reintentar una comprovació de només lectura abans de convertir-la en una pregunta a algú altre.
+
+**I el règim estable, que és el que faltava per poder dir que corre sol:** del **30/09 al 05/10/2026**,
+sis nits seguides a la 01:00 UTC —runs **161, 162, 163, 164, 165 i 166**— totes `SUCCESS` en 11-12
+segons, amb el mirall segellat a les 00:45 i cap correu d'alerta.
+
+⏳ **El que queda de `AE01SAPRDP` no ha canviat**: desactivar-hi la tasca vella i esborrar
+l'`appsettings.Production.json`, que té credencials i ja no fa cap feina. Amb dues màquines amb la
+tasca activa es trepitgen.
+
+⚠️ **I no es pot fer des de l'equip local.** Comprovat el 05/10/2026: `.239` deixa passar el
+`Test-WSMan` però denega l'`Invoke-Command` i el `schtasks /query /s` a `ohijazo`
+(*Acceso denegado*), al contrari que `.136`, on tots dos funcionen. O sigui que això va per **RDP**
+—`ohijazo` hi té accés des del 16/09— o per Sistemes, perquè la tasca la va crear un administrador.
 
 ### Les famílies: el problema dels 782 articles no existia (16/09/2026)
 
@@ -1017,9 +1491,9 @@ Amb el flag a `'1'`, mesurat sobre el mirall real, sortirien **14 famílies**: l
 **Correu enviat a l'Adrià el 31/08/2026** (`resposta_adria_2.md` / `.docx`). Hi van cinc preguntes, i
 tres bloquegen feina nostra amb data 1 de novembre:
 
-1. **El `/100`** — la urgent. Les seves SQL divideixen `product_price` i `product_cost` per 100 però
-   no `net_amount`. O el treu ell el dia del tall, o els hi enviem multiplicats per 100, però s'ha de
-   decidir: sense resposta és un error silenciós el dia 2. Si no contesta, insistir-hi sol.
+1. ~~**El `/100`**~~ ✅ **TANCAT el 05/10/2026**: el treu ell, els preus van en euros i a nosaltres no
+   ens toca res. Va costar tres correus (31/08, 16/09, 01/10) i la lliçó és la que ja deia la nota del
+   16/09: **repreguntar-ho sol**, perquè contestava de tot menys d'això. Veure §9.
 2. ~~**Famílies**~~ ✅ **Resolt el 16/09/2026 amb xifres, no amb una decisió.** Veure *Les famílies:
    el problema dels 782 articles no existia*, més avall.
 3. **Congelar el número d'adreça** al tall, o confiar en l'alarma `vanished_ids` (§6.5).
@@ -1029,11 +1503,11 @@ tres bloquegen feina nostra amb data 1 de novembre:
    `est_atributs_client` i un canvi a `sp_load_client_attributes`.
 
 
-- **Usuari tècnic de SAP.** Ara la sonda va amb `OHijazo`, un usuari **nominal**, amb contrasenya
-  de 4 caràcters. Per a la sonda és acceptable (només llegeix), però per al job nocturn no: els
-  logs d'auditoria de SAP atribuirien les lectures de l'ETL a una persona, i el dia que aquesta
-  persona canviï la contrasenya o marxi, l'ETL peta. Cal crear un usuari tècnic dedicat de només
-  lectura.
+- ~~**Usuari tècnic de SAP.**~~ ✅ **Resolt el 05/10/2026**: el pipeline i la sonda van amb
+  **`proceso`**, el compte compartit del partner, i no s'ha hagut de comprar cap llicència. El motiu
+  pel qual això era urgent es manté per als altres tres projectes de `P:`, que segueixen amb
+  `OHijazo`: els logs d'auditoria de SAP atribueixen les lectures a una persona, i el dia que canviï
+  la contrasenya o marxi, s'aturen tots alhora.
 - **`product_cost`**: acordar amb l'Adrià quina definició de cost hi posem (§6.2). De moment surt
   **0 a propòsit** (`Sync:CostField = "none"`), perquè es vegi que no el tenim.
 - **Normalitzar el `discount`.** L'Adrià ens diu (26/08/2026) que la convenció de KAIS també estava

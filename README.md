@@ -148,7 +148,7 @@ P:\GAPI07_Analitza\
 - Login `analitza_ro` creat amb permisos només-lectura a `IntercanviSAP`
 - Dades a test (run 91, 24/08/2026): 5.651 client_locations, 2.028 productes,
   5.651 atributs client, 110 famílies, 49 agents
-- ⚠️ **`DB_FARINERA_TEST` gairebé no té documents**: 62 línies d'albarà (47 documents,
+- ⚠️ **`DB_FARIN_TEST` gairebé no té documents**: 62 línies d'albarà (47 documents,
   maig–agost 2026) i 16 efectes pendents. La lògica de documents està poc exercitada a test;
   el volum real només es veurà a productiva
 - 4 UDFs mappejats: `POS. BCN CONSULTING`, `SEGMENT US FARINA 1`, `SEGMENT US FARINA 2`, `SUBFAMILIA`
@@ -156,9 +156,14 @@ P:\GAPI07_Analitza\
 ### 🔄 Pendent (per fases)
 
 **Bloc A — Sistemes (infraestructura)**
-- [ ] **Desplegar el Worker a `AE01SAPRDP`** — petició llesta a `peticio_sistemes_worker.docx`.
-      Cal compte de servei, carpeta amb permisos tancats i tasca programada a les 02:45.
-      Sense això el job de les 03:00 avorta amb `ABORTED_STALE_MIRROR`
+- [x] ✅ **Worker desplegat a `AE02SAPRDP`** (192.168.11.136) el 25/09/2026, i **el cicle nocturn
+      torna a córrer sol des del 29/09**: la tasca de les 02:45 hi era des del 16/09 però estava
+      **desactivada** i no havia corregut mai. Sis nits seguides desateses del 30/09 al 05/10 (runs
+      161-166, `SUCCESS` en ~11 s). Diagnòstic de la màquina amb `deploy\Check-WorkerHost.ps1`; els
+      passos, a `deploy/README.md`
+- [ ] **Netejar `AE01SAPRDP`**: desactivar-hi la tasca vella i esborrar l'`appsettings.Production.json`,
+      que té credencials i ja no fa cap feina. **No es pot des de l'equip local**: `.239` denega WinRM
+      i `schtasks` (05/10/2026), així que va per RDP o per Sistemes
 - [ ] Rebre resposta sobre el compte SMTP per a Database Mail
 - [ ] Passar-los la IP d'Analitza perquè obrin el firewall al port 1433, quan l'Adrià la doni
 
@@ -321,10 +326,16 @@ Ara són **dos** llocs: el Worker l'ha de baixar de SAP, i el SP l'ha de project
 Ja **no** és un `UPDATE` a `cfg.settings`: la companyia de SAP la marca el Worker.
 
 ```powershell
-# DEV
+# DEV — des de src\SapB1AnalitzaSync.Worker
 dotnet user-secrets set "ServiceLayer:CompanyDb" "DB_FARINERA_PROD"
-# PRD: variable d'entorn de màquina del compte que executa SQL Agent
 ```
+
+**PRD**: a `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json` d'`AE02SAPRDP`, el fitxer del
+costat de l'executable. **No** a una variable d'entorn: aquella màquina allotja webservices de
+tercers que la podrien llegir, i a més les variables d'entorn guanyen sobre els JSON, així que
+posar-la-hi deixaria l'`appsettings.Production.json` dient una cosa i el procés fent-ne una altra.
+Detall a `deploy/README.md`, secció 3. El Worker tampoc corre sota SQL Agent: corre com a tasca
+programada de les 02:45 amb `sapsistema`, i qui corre sota SQL Agent és `etl.sp_run_all`.
 
 Després, verificar abans de deixar-ho córrer:
 
@@ -373,7 +384,7 @@ materialitzen, i és molt més barat migrar ara, en dev.
 | 2 — Worker .NET 8 | ✅ `src\` — 0 warnings, 23 tests verds |
 | 3 — SPs repuntats a `sap_raw` | ✅ Escrits; **no desplegats** fins que el mirall tingui dades |
 | 4 — Validació `staging` vs `baseline` | ⏳ `sql/verify_migration.sql` |
-| 5 — Tall i neteja | ⏳ Falta revocar el permís de lectura sobre `DB_FARINERA_TEST` |
+| 5 — Tall i neteja | ⏳ Falta revocar el permís de lectura sobre `DB_FARIN_TEST` |
 
 **Resultats de la sonda:**
 

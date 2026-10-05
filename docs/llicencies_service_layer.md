@@ -26,7 +26,7 @@ pregunta a fer a cada projecte no és quan corre sinó **si fa Logout**.
 
 | Projecte | Usuari de SL avui | Quan corre | Fa `Logout`? |
 |---|---|---|---|
-| **GAPI07_Analitza** (aquest) | `OHijazo` | **02:45, ~20 s.** L'únic amb finestra fixa i curta | ✅ **Sí**, a `DisposeAsync` |
+| **GAPI07_Analitza** (aquest) | ✅ **`proceso`** des del 05/10/2026 | **02:45, ~20 s.** L'únic amb finestra fixa i curta | ✅ **Sí**, a `DisposeAsync` |
 | **GAPI03_CRM** | user-secrets | **cada hora** (`IncrementalInterval: 01:00:00`) + reconciliació a les **03:00** | ⚠️ Sí, però **només en aturar el servei** |
 | **preparacioComandesVendaSAP** | `OHijazo` | **en qualsevol moment** | ❓ |
 | **ActualitzadorPreusSap** | `OHijazo` | **en qualsevol moment** | ✅ Sí, i amb test que ho vigila |
@@ -102,6 +102,23 @@ alhora i ningú sabrà per què. Qualsevol compte indirecte dedicat ja és una m
 diferència poden fallar amb `Invalid login credential` per *throttling* del pool de sessions (Regla
 02). Si es comparteix compte, separar els processos mitja hora, no un minut.
 
+## ✅ El primer pas, fet el 05/10/2026: GAPI07 va amb `proceso`
+
+**El salt de zero a un ja està fet, i no ha costat cap llicència.** `proceso` és el compte que el
+partner va crear per a processos no concurrents, la contrasenya és la mateixa que la d'`OHijazo` i el
+canvi va ser una sola clau als dos llocs del punt 2 de sota.
+
+Verificat pel camí real: `--once` **a `AE02SAPRDP`**, amb la configuració de producció, surt amb `0`,
+al log hi diu `usuari=proceso` i les **nou entitats** de `sap_raw.sync_state` queden segellades.
+
+⏳ **El que queda per tancar-ho bé és la pregunta 1 de més avall**: a quina hora corren GAPI01 i
+GAPI09, que comparteixen el compte. Mentre no se sàpiga, compartir-lo és «probable», no «assegurat»
+—i la unitat és el temps de **sessió**, no el d'execució—. Nosaltres fem `Logout`, així que la nostra
+meitat del tracte està complerta.
+
+⚠️ **I el que NO arregla:** `OHijazo` segueix als altres tres projectes, amb la mateixa contrasenya de
+4 caràcters. El dia que canviï o marxi, s'aturen tots tres.
+
 ## El pla: treure `OHijazo` de tot arreu
 
 L'objectiu no és optimitzar llicències, és **que cap procés desatès corri amb l'usuari d'una
@@ -120,7 +137,7 @@ construcció, no per confiança. Els altres projectes sí que escriuen i necessi
 
 | On | Què |
 |---|---|
-| `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json` a `AE01SAPRDP` | `ServiceLayer:UserName` i `:Password` |
+| `C:\Apps\SapB1AnalitzaSync\appsettings.Production.json` a `AE02SAPRDP` | `ServiceLayer:UserName` i `:Password` |
 | Els user-secrets de l'equip de desenvolupament | Els mateixos dos |
 
 **3. Verificar-ho pel camí real**, no pel que s'hi assembla:

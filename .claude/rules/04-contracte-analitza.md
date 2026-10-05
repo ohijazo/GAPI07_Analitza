@@ -7,9 +7,21 @@ el que els donava KAIS. **Les 8 taules `est_*` són un contracte, no un detall d
 
 - **Noms de taules i de columnes** de `dbo.est_*`. Estan calcats de KAIS expressament perquè
   Analitza no hagi de canviar cap consulta.
-- **`est_clients.id_client_location`** = `<codi de client> + '-' + LPAD(LineNum, 3)`. És la clau que
-  enllaça clients, línies d'albarà, atributs i cobraments. Si canvia, Analitza perd l'històric de
-  tots els clients.
+- **`est_clients.id_client_location`** = `<codi de client> + '-' + <número d'adreça de 3 dígits>`. És
+  la clau que enllaça clients, línies d'albarà, atributs i cobraments. Si canvia, Analitza perd
+  l'històric de tots els clients.
+
+  ⚠️ **El número d'adreça NO és el `CRD1.LineNum` ni la posició de l'adreça dins del client.** Viu
+  congelat a `cfg.client_ship_no`, i el valor surt del **prefix `NNN-` del nom de l'adreça de SAP**
+  (`CRD1.Address` = `003-SANT QUIRZE-ST. QUIRZE`), que és on la migració KAIS→SAP va deixar el número
+  que Analitza té a l'històric. La regla viu en un sol lloc, `etl.vw_client_ship_kais_no`.
+
+  Aquesta línia ha estat **dues vegades falsa**: deia `LPAD(LineNum, 3)` quan ja feia setmanes que era
+  el `ship_no` congelat, i el `ship_no` es va congelar el 01/09/2026 amb un `ROW_NUMBER()` per
+  `LineNum` que era una **permutació** dels números bons. Es va corregir el 29/09/2026 (804 adreces)
+  després que la comparativa d'Analitza ho destapés: 87,6 % → 99,2 % de codis postals quadrant contra
+  el seu propi cens. Qualsevol hipòtesi nova sobre aquest número **es mesura contra
+  `cfg.analitza_client_export`** amb `sql/verify_ship_no.sql`, mai contra `baseline`.
 
   El `<codi de client>` **no és el `CardCode` de SAP**: és
   `COALESCE(U_FCCodiKais, CardCode)`, i viu en un sol lloc, `etl.vw_client_code`. Els identificadors
@@ -29,12 +41,21 @@ el que els donava KAIS. **Les 8 taules `est_*` són un contracte, no un detall d
   `net_amount = product_price * quantity * discount`. És `decimal(9,6)`: amb dos decimals un
   descompte del 3,33% s'arrodonia a `0,97` i `formula_break` saltava cada nit.
 
-- **⚠️ L'escala de `product_price` està sense tancar.** Les consultes que Analitza executa de debò
-  (`docs/sql importació Farinera.sql`) fan `product_price/100` i `product_cost/100`, però **no**
-  divideixen `net_amount`. O sigui que KAIS els guardava en cèntims. Nosaltres emetem `PriceBefDi`
-  en euros. Si arribem al 2 de novembre sense decidir-ho, els preus li queden 100× petits, el
-  `net_amount` queda bé, i **cap validació ho detecta**: cada xifra és coherent amb ella mateixa.
-  O l'Adrià treu el `/100` de la seva SQL o ho multipliquem nosaltres, però ha de quedar escrit.
+- **✅ L'escala de `product_price` és en EUROS, i això ja està acordat per escrit (05/10/2026).**
+  KAIS els guardava en cèntims i les SQL que Analitza executava de debò
+  (`docs/sql importació Farinera.sql`) feien `product_price/100` i `product_cost/100` sense dividir
+  `net_amount`. **El `/100` el treu ell**: al correu del 05/10/2026 enumera els canvis que ja té
+  provats per al dia del tall, i els dos primers són `product_price/100 -> product_price` i
+  `product_cost/100 -> product_cost`.
+
+  Es deixa escrit perquè era **l'únic punt del contracte que el dia del tall fallava en silenci**:
+  si ell hagués mantingut el `/100`, els preus li quedarien 100× petits, el `net_amount` quadraria
+  igual i cap validació nostra ho detectaria. **No multiplicar per 100 al nostre costat**, ni
+  "per si de cas": les dues correccions alhora tornarien a desquadrar-ho.
+
+  Del mateix correu: **ell carrega només línies amb `date >= '2026-11-02'`**, així que res del que
+  publiquem abans del tall li arriba. I **no diu res del `discount`**, o sigui que manté el seu
+  `1 - discount` i la convenció del multiplicador es queda com està (`DISCOUNT_AS_PERCENT = '0'`).
 - **Els imports negatius** de devolucions i abonaments porten `quantity` negativa també. La guia
   d'Analitza ho exigeix i `sp_data_quality_checks` ho verifica.
 

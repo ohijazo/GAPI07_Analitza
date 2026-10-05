@@ -1,8 +1,18 @@
 # Crear l'usuari tècnic de SAP per a Service Layer
 
-El Worker llegeix SAP per Service Layer. Ara ho fa amb **`OHijazo`**, un usuari nominal amb
-contrasenya de quatre caràcters. Cal substituir-lo abans que això corri desatès en una màquina
-compartida.
+> ✅ **RESOLT EL 05/10/2026, i per una via més curta que la d'aquesta guia: el Worker va amb
+> `proceso`**, el compte que el partner ja havia creat per a processos no concurrents. No s'ha creat
+> cap `GAPI07_RO` i no s'ha comprat cap llicència. Allà on aquí es llegeix `GAPI07_RO`, avui hi diu
+> `proceso`.
+>
+> **Aquest document es conserva per dos motius**: el raonament de *Per què no pot quedar-se com està*
+> segueix sent vàlid i encara s'aplica als **altres tres projectes de `P:`**, que continuen amb
+> `OHijazo`; i si algun dia es decideix que cada procés tingui el seu usuari, els permisos mínims i
+> els passos de creació són els d'aquí. L'estat real viu a `docs/llicencies_service_layer.md`.
+
+El Worker llegeix SAP per Service Layer. Fins al 05/10/2026 ho feia amb **`OHijazo`**, un usuari
+nominal amb contrasenya de quatre caràcters. Calia substituir-lo abans que allò corregués desatès en
+una màquina compartida.
 
 ## Per què no pot quedar-se com està
 
@@ -14,7 +24,7 @@ compartida.
   funcionar sense que ningú ho relacioni.
 - **Privilegis.** Un usuari nominal té les autoritzacions de la persona. El Worker només ha de
   llegir cinc entitats.
-- **On acabarà la contrasenya.** En un fitxer de configuració a `AE01SAPRDP`, que allotja
+- **On acabarà la contrasenya.** En un fitxer de configuració a `AE02SAPRDP`, que allotja
   webservices de tercers. Val més que sigui la d'un compte que només pot llegir.
 
 ## Què crear
@@ -81,7 +91,7 @@ contrasenya s'ha de canviar per una de llarga i no s'ha de tocar mai més.
    La sonda ha de passar sencera. Si alguna entitat falla amb 401 o amb un error d'autorització, hi
    falta un permís de lectura.
 
-2. Aquesta contrasenya és la que anirà a l'`appsettings.json` de `AE01SAPRDP`. Al gestor.
+2. Aquesta contrasenya és la que anirà a l'`appsettings.json` de `AE02SAPRDP`. Al gestor.
 
 3. Actualitza també `P:\preparacioComandesVendaSAP\.env` si vols que aquell projecte deixi
    d'anar amb `OHijazo` — **però compte, aquell sí que escriu a SAP** i necessita permisos que

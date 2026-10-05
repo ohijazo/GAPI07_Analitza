@@ -18,11 +18,11 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 | Depèn de | Què falta |
 |---|---|
-| **Adrià (Analitza)** | El **«confirmat» per escrit del `/100`**, demanat a `resposta_adria_3.docx` (enviat el **16/09/2026**). És l'únic que queda d'ell i l'únic punt que falla en silenci; la resta del correu del 31/08 ja està contestada |
+| ~~**Adrià (Analitza)** — el `/100`~~ | ✅ **Tancat el 05/10/2026, per escrit i amb el codi al davant.** Enumera els canvis que ja té provats per al dia del tall i els dos primers són `product_price/100 -> product_price` i `product_cost/100 -> product_cost`. **Nosaltres no hem de fer res**: els preus van en euros tal com surten. Del mateix correu: carrega només `date >= '2026-11-02'`, i **del `discount` no diu res**, o sigui que manté el seu `1 - discount` |
 | ~~**Nosaltres — handoff**~~ | ✅ **Tancat el 16/09/2026**: contrasenya d'`analitza_ro` passada per un canal a part. Analitza té ruta, credencial i dades |
 | **Nosaltres — abans del tall** | Activar `cfg.settings.FAMILY_FROM_COMMERCIAL` a `'1'` (les 12 famílies en comptes dels 110 grups). Codi desplegat i validat el 16/09/2026; el flag és a `'0'`. **Fa desaparèixer 110 identificadors alhora**, així que vol `ID_DROP_MAX` apujat aquell dia i baixat l'endemà. I omplir la família dels **vuit articles** de `docs/memoria_projecte.md` |
-| ~~**Sistemes**~~ | ✅ **Res pendent des del 16/09/2026.** Worker desplegat a `AE01SAPRDP`, tasca `GAPI07 Refresca sap_raw` a les 02:45 amb `sapsistema`, provada amb `LastTaskResult = 0` i `sync_state` refrescat. ~~Accés d'Analitza~~ ✅ **10/09/2026** — ja tenen VPN i `AE01SAPSQL:1433`, i les credencials de VPN són les de sempre |
-| **Llicències** | Usuari tècnic `GAPI07_RO`. Ara el pipeline va amb `OHijazo`, nominal |
+| **Sistemes** | ✅ **El cicle nocturn torna a córrer sol des del 29/09/2026** a `AE02SAPRDP` (192.168.11.136): la tasca hi era des del 16/09 però **estava desactivada**. Sis nits seguides desateses del 30/09 al 05/10 (runs 161-166, tots `SUCCESS` en ~11 s). Carpeta, ACL, sortida cap a `192.168.11.238:50000` i `:1433` i el dret *Log on as a batch job* ja hi eren. ⏳ **El que queda és `AE01SAPRDP`**: desactivar-hi la tasca vella i esborrar l'`appsettings.Production.json`, que té credencials i ja no fa cap feina. **Des de l'equip local no es pot**: `.239` denega WinRM i `schtasks` a `ohijazo` (comprovat el 05/10/2026), així que va per RDP o per Sistemes. ~~Accés d'Analitza~~ ✅ **10/09/2026** |
+| ~~**Llicències** — usuari del pipeline~~ | ✅ **Resolt el 05/10/2026 sense comprar cap llicència**: el pipeline va amb **`proceso`**, el compte compartit que el partner va crear per a processos no concurrents. `GAPI07_RO` ja no cal. Canviat als user-secrets i a `appsettings.Production.json` d'`AE02SAPRDP`, i verificat pel camí real (login `usuari=proceso` i mirall segellat). ⏳ **Queda confirmar amb en Carles a quina hora corren GAPI01 i GAPI09**, que comparteixen el mateix compte: compartir vol dir que les *sessions* no se solapin, i nosaltres alliberem de seguida perquè fem `Logout` |
 | ~~Consultors de SAP~~ | ✅ **Resolt l'01/09/2026**: el blueprint signat (cap. 17.3) diu que **no es migra l'històric documental**. Veure sota |
 | **Nosaltres** | **Passar la contrasenya d'`analitza_ro` a l'Adrià.** Ja no depèn de ningú: Sistemes els van habilitar l'accés el 10/09/2026. Compte, que ells creuen que "no ha canviat res" — la contrasenya sí que va canviar el 31/08 i els permisos es van acotar el mateix dia |
 
@@ -135,15 +135,16 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    Deixar-la a `docs/client_locations.csv`, que és d'on la llegeix `Sync:KaisClientExportPath`.
 
 2. **Repetir la comparació d'ids contra `DB_FARINERA_PROD`, no contra test.** Les xifres que tenim
-   —5.621 de 5.684 conservats, 13 clients sense codi— estan mesurades contra `DB_FARINERA_TEST`, que
-   és una còpia i va endarrerida. Part dels 13 poden existir a la productiva.
+   —5.621 de 5.684 conservats, 13 clients sense codi— estan mesurades contra la companyia de test
+   (`DB_FARINERA_TEST` aleshores, `DB_FARIN_TEST` des del 22/09/2026: és una restauració de la
+   mateixa), que és una còpia i va endarrerida. Part dels 13 poden existir a la productiva.
 
    ```powershell
    $env:DOTNET_ENVIRONMENT='Development'
    dotnet run --project P:\GAPI07_Analitza\src\SapB1AnalitzaSync.Worker -- --probe
    ```
 
-2b. **Comprovar `01761 ESPECIFICA TURRIS` a la productiva.** A `DB_FARINERA_TEST` és una closca buida
+2b. **Comprovar `01761 ESPECIFICA TURRIS` a la productiva.** A `DB_FARIN_TEST` és una closca buida
    —sense nom ni unitat de venda, al grup dels articles de prova— mentre que a KAIS està complet i ha
    facturat 62.675 € en dotze mesos. Si a `DB_FARINERA_PROD` també li falta el nom, el problema no és
    la família: és l'article. I si està bé, posar-li la família que hagi dit comercial.
@@ -167,6 +168,22 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    cacheades i la consulta arriba a SQL amb una columna que ja no existeix.
 
    A productiva això encara no s'ha fet.
+
+4b. **Comprovar si a la productiva hi ha documents de 100 línies o més.** `id_invoice_line` és
+   `offset + DocEntry*100 + LineNum`, o sigui que **només hi caben dos dígits de `LineNum`**: un
+   document amb 100 línies col·lisiona amb el `DocEntry` següent i la càrrega peta amb violació de
+   PK (`PK_staging_est_linies_albara`). És la fallada bona —sorollosa—, però aquella nit Analitza es
+   queda amb les dades d'ahir, i la fórmula és **contracte**: no es pot canviar sola, s'ha de parlar
+   amb l'Adrià. A `DB_FARIN_TEST` no es pot mesurar (màxim **7 línies** per albarà, 47 documents de
+   joguina), i la productiva arrenca sense històric documental (blueprint 17.3), així que el risc
+   real són els documents que es facin **a partir del dia 2**.
+
+   ```sql
+   SELECT TOP 5 DocEntry, COUNT(*) AS linies, MAX(LineNum) AS max_linenum
+   FROM   sap_raw.DLN1 GROUP BY DocEntry HAVING COUNT(*) >= 90 ORDER BY COUNT(*) DESC;
+   ```
+
+   Si surt alguna cosa, repetir-ho amb `RDN1` i `RIN1`. Mirat el 05/10/2026 a test: 7, 3 i 4.
 
 5. **Passar la contrasenya d'`analitza_ro` a Analitza** per un canal a part, un cop Sistemes els
    hagi habilitat la VPN. Ja està rotada (31/08/2026) i apuntada al gestor. L'endpoint i les
@@ -194,6 +211,14 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
       taula que fixa la meitat dreta de `id_client_location`, i **no es pot regenerar**: si es perd,
       tots els números es recalculen i Analitza veu desaparèixer ubicacions i néixer-ne de noves amb
       l'històric d'una altra. Ha d'entrar al backup.
+- [ ] **Comprovar que `ship_no_prefix_mismatch` val exactament `cfg.settings.SHIP_NO_PREFIX_BASELINE`**
+      (a 29/09/2026: `4`). Si és més alt, algú ha tocat `cfg.client_ship_no` o l'ha restaurada d'un
+      backup anterior al 29/09 — i llavors 804 ubicacions tornen a apuntar a l'adreça equivocada
+      sense que `ship_no_missing` ni `vanished_ids` ho diguin. Veure `docs/memoria_projecte.md` §6.5b.
+- [ ] **Tornar a demanar l'exportació de `client_locations` a l'Adrià** i carregar-la amb
+      `tools\Import-AnalitzaClientExport.ps1`. És l'única referència vàlida per comprovar els
+      identificadors: `baseline` compara SAP amb SAP i ja ha donat un fals 100% tres vegades. La
+      comprovació és `sql\verify_ship_no.sql`, i l'ha de fer **contra la productiva**.
 
 ---
 
@@ -205,14 +230,64 @@ productiva, no després.
 ### 2.1 Apuntar el Worker a la companyia productiva
 
 A `appsettings.Production.json` del servidor, al costat de l'executable —no a variables d'entorn de
-màquina, perquè `AE01SAPRDP` allotja webservices de tercers que les llegirien:
+màquina, perquè `AE02SAPRDP` allotja webservices de tercers que les llegirien:
 
 ```
 ServiceLayer:CompanyDb  ->  DB_FARINERA_PROD
 ```
 
+⚠️ **`DB_FARINERA_PROD` és un nom que aquest runbook dona per fet, i no està confirmat.** El
+22/09/2026, a `AE01SAPSQL` hi havia `DB_FARIN_TEST` (test), `SBO-COMMON`, `DB_FARINERA_TEST`
+(OFFLINE) i **`DB_FARINERA`** — cap `DB_FARINERA_PROD`. Si la companyia productiva és `DB_FARINERA`,
+posar-hi el nom d'aquest quadre fa que el Worker peti amb `Invalid login credential`, un missatge
+que apunta a la contrasenya i no al nom. **Confirmar-ho amb els consultors abans del tall**, i
+comprovar-ho amb `--probe` des d'`AE02SAPRDP`, que hi entra i no fa cap escriptura.
+
 **No** és un `UPDATE` a `cfg.settings`. `SBO_DB` es va esborrar de la base de dades el 26/08/2026
 precisament perquè ningú el canviés pensant que era l'interruptor.
+
+### 2.1b-bis El número d'adreça de les altes noves es resol sol
+
+`cfg.client_ship_no` és **la mateixa taula per a test i per a productiva**: canviar `CompanyDb` no la
+toca, i no s'ha de buidar (veure 2.1b). Des del 29/09/2026 el número surt del prefix `NNN-` del nom de
+l'adreça de SAP, i `etl.sp_assign_client_ship_no` aplica la mateixa regla a les adreces noves.
+
+**Conseqüència per al dia 2:** les adreces que a la companyia de test no hi són i a la productiva sí
+—§6.6 de la memòria: 45 dels 63 locations perduts— arribaran com a adreces noves i **agafaran el seu
+número de KAIS automàticament**, no un `MAX+1` inventat. Això no vol cap pas manual, però sí una
+comprovació: després del primer run contra la productiva, mirar
+`SELECT ship_no_source, COUNT(*) FROM cfg.client_ship_no GROUP BY ship_no_source` i veure que les
+altes noves han anat a `PREFIX` i no a `MAXPLUS1`. Si van a `MAXPLUS1` en massa, la productiva no porta
+el prefix al nom de l'adreça i **cal parar**: seria el mateix error de l'01/09 amb una altra cara.
+
+### 2.1b Buidar el mirall — obligatori, i no és evident
+
+Canviar `CompanyDb` **no reinicia res**. `sap_raw.sync_state` té com a clau només l'entitat: no
+guarda de quina companyia ve cada cursor, i tampoc ho guarda cap taula mirall ni `audit.etl_runs`.
+Sense aquest pas, el primer cicle contra la productiva arrenca amb els cursors de test i el mirall
+ple de dades de test.
+
+```sql
+-- El cursor. Sense això, els documents es demanen des de l'últim UpdateDate vist
+-- a test, i tot el que la productiva tingui anterior a aquella data no es baixa mai.
+DELETE FROM IntercanviSAP.sap_raw.sync_state;
+
+-- Les taules de documents. El Worker només esborra els DocEntry del lot que
+-- baixa, i DB_FARINERA_PROD no retornarà mai els DocEntry de test: les 47
+-- capçaleres i 62 línies inventades es quedarien barrejades amb les de
+-- productiva i arribarien a Analitza.
+TRUNCATE TABLE IntercanviSAP.sap_raw.DLN1;  TRUNCATE TABLE IntercanviSAP.sap_raw.ODLN;
+TRUNCATE TABLE IntercanviSAP.sap_raw.RDN1;  TRUNCATE TABLE IntercanviSAP.sap_raw.ORDN;
+TRUNCATE TABLE IntercanviSAP.sap_raw.RIN1;  TRUNCATE TABLE IntercanviSAP.sap_raw.ORIN;
+TRUNCATE TABLE IntercanviSAP.sap_raw.OINV;
+```
+
+Els mestres (`OCRD`, `CRD1`, `OITM`, `OITB`, `OSLP`, `OPYM`) **no** s'han de tocar: el Worker ja els
+fa `TRUNCATE` + càrrega sencera a cada cicle.
+
+⚠️ **`cfg.client_ship_no` no s'ha de buidar mai**, ni aquí ni enlloc: congela el número d'adreça de
+cada client i **no es pot regenerar**. Si es perd, Analitza enganxa l'històric d'albarans d'una
+adreça a una altra.
 
 ### 2.2 Apujar `ID_DROP_MAX`
 
@@ -247,10 +322,19 @@ Dos fets operatius que se'n deriven i que val la pena tenir presents:
 - **KAIS es manté viu com a plataforma de consulta.** És el que fa possible la càrrega puntual del
   desembre per corregir el cost d'octubre: la base de dades antiga hi serà.
 
-### 2.4 El `discount` i el `/100` — el canvi coordinat
+### 2.4 El `discount` — i el `/100`, que ja està resolt
 
-**Aquests dos només es toquen si l'Adrià els fa el mateix dia al seu costat.** Si no ha contestat,
-no es toca res: la convenció actual funciona i es pot canviar més endavant amb calma.
+⚠️ **Llegeix això abans de tocar el flag: des del 05/10/2026 la resposta per defecte és NO TOCAR RES.**
+L'Adrià ha enumerat per escrit els canvis que farà el dia del tall i **el `discount` no hi és**: manté
+el seu `1 - discount`, o sigui que la convenció del multiplicador es queda. `DISCOUNT_AS_PERCENT` es
+queda a `'0'`.
+
+El bloc de sota es conserva perquè el dia que es normalitzi —amb calma, no el dia del tall— el
+mecanisme és aquest i està provat.
+
+**El `/100` ja no és un canvi coordinat: el treu ell i a nosaltres no ens toca res.** Els preus van
+en euros tal com els emetem. **No multiplicar per 100 "per si de cas"**: les dues correccions alhora
+tornarien a desquadrar-ho.
 
 ```sql
 -- Nomes si Analitza treu el seu "1 - discount" avui
@@ -272,11 +356,11 @@ Provat el 31/08/2026 als quatre casos: flag a 0 i a 1 donen el mateix `net_amoun
 `quantity` i només canvia el `discount`; `formula_break` calla en tots dos; l'incremental el dia del
 canvi es converteix en FULL tot sol; i l'incremental en règim estable no dona la volta dues vegades.
 
-El `/100` és la meitat que **no** està al nostre costat: KAIS li guardava els preus en cèntims i les
-seves SQL fan `product_price/100` i `product_cost/100` sense dividir `net_amount`. Nosaltres emetem
-euros. Si ell no treu el `/100`, els preus li queden 100× petits, el `net_amount` queda bé i **cap
-validació ho detecta**. Si prefereix que els hi enviem multiplicats per 100, això sí que és feina
-nostra i s'ha de fer abans, no aquell dia.
+Del `/100` només queda la vigilància: KAIS li guardava els preus en cèntims i les seves SQL feien
+`product_price/100` i `product_cost/100` sense dividir `net_amount`. **El 05/10/2026 confirma que el
+treu**, i nosaltres emetem euros. Però si el dia 2 se li oblidés, els preus li quedarien 100× petits,
+el `net_amount` quadraria igual i **cap validació nostra ho detectaria**: no es veu des d'aquí, es veu
+mirant una línia de la seva banda. Val la pena preguntar-l'hi el dia 3.
 
 Un cop fets 2.1–2.4, actualitzar `.claude/rules/04-contracte-analitza.md` i
 `docs/memoria_projecte.md`, que documenten la convenció del multiplicador com si fos l'única.
