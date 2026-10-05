@@ -1523,6 +1523,14 @@ tres bloquegen feina nostra amb data 1 de novembre:
   la contrasenya o marxi, s'aturen tots alhora.
 - **`product_cost`**: acordar amb l'Adrià quina definició de cost hi posem (§6.2). De moment surt
   **0 a propòsit** (`Sync:CostField = "none"`), perquè es vegi que no el tenim.
+
+  ⚠️ **Ara que el `/100` està tancat, aquest és el forat gros que queda del contracte.** Mesurat el
+  05/10/2026: `dbo.est_linies_albara` té **231 línies i 231 amb `product_cost = 0`**. I el seu correu
+  del 05/10 demostra que **segueix consumint la columna** —entre els canvis que farà hi ha
+  `product_cost/100`—, o sigui que el dia 2 veuria **cost zero i marges a zero**, amb cada xifra
+  coherent amb ella mateixa i cap check capaç de veure-ho: la **mateixa família de fallada que el
+  `/100`**. Preguntat a `resposta_adria_5` amb les tres sortides de §6.2 (acceptar `GrossBuyPrice`
+  sabent què és, acordar una altra definició, o confirmar que ja no el fan servir).
 - **Normalitzar el `discount`.** L'Adrià ens diu (26/08/2026) que la convenció de KAIS també estava
   malament: segons la seva guia, `discount` és el **percentatge** (0.25 = 25%) i la fórmula és
   `net_amount = price × qty × (1 - discount)`. KAIS els enviava el multiplicador, i ho tapen amb un

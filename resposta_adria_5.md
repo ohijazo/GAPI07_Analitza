@@ -23,6 +23,24 @@ sortirien a zero.
 
 Del filtre `date >= '2026-11-02'`, entesos.
 
+## El `product_cost` us arribarà a zero si no ho decidim
+
+Justament perquè al teu canvi hi ha `product_cost/100`, t'ho avanço: **avui aquella columna va a 0 a
+totes les línies**, i no és un error de càrrega. KAIS us donava el cost mitjà de l'article **congelat
+al moment de l'albarà**, i Service Layer —l'API oficial de SAP, que és per on hem de passar ara— **no
+exposa res equivalent**. El candidat més pròxim és el preu de compra **actual** de l'article:
+coincideix amb el que us arribava en un 92 % dels casos, però **no és el mateix concepte** —un article
+que hagi mogut el cost des de l'albarà ja no quadra—, i no te'l vull colar com si fos el mateix camp.
+
+Tal com està, el 2 de novembre tindríeu **cost zero i marges a zero**, i per cada xifra per separat
+semblaria correcte. Tres sortides, i la tria és vostra:
+
+1. **Accepteu el preu de compra actual** com a aproximació, sabent exactament què és.
+2. **Em dieu una altra definició de cost** i miro si la puc obtenir de SAP.
+3. **Em confirmeu que ja no el feu servir** i el deixem buit.
+
+Qualsevol de les tres em va bé; la que no em va bé és arribar al dia 2 sense haver-ho dit.
+
 **Les ubicacions:** si encara no heu importat res a producció, el mapatge `id_antic → id_nou` no el
 necessiteu i no t'empipo més. El tinc guardat; si mai fa falta, demana-me'l.
 
@@ -75,8 +93,16 @@ ohijazo@agrienergia.com
 més pot contestar es repregunta **sola**; les dues vegades que anava dins d'un correu amb altres temes,
 va contestar la resta.
 
-**El que queda d'ell:** magatzem i previsions (no contestat dues vegades), el «sí» del `discount` —que
-no bloqueja res, perquè la decisió per defecte és no tocar-lo— i els documents de 100+ línies.
+**El que queda d'ell:** el **`product_cost`**, magatzem i previsions (no contestat dues vegades), el
+«sí» del `discount` —que no bloqueja res, perquè la decisió per defecte és no tocar-lo— i els documents
+de 100+ línies.
+
+⚠️ **El `product_cost` passa a ser el forat gros, ara que el `/100` està tancat.** Mesurat avui:
+`dbo.est_linies_albara` té **231 línies i 231 amb `product_cost = 0`** (`Sync:CostField = "none"`, a
+propòsit). El seu correu demostra que **segueix consumint la columna** —n'està canviant l'escala—, així
+que el dia 2 veuria marges a zero amb cada xifra coherent amb ella mateixa: la mateixa família de
+fallada que el `/100`. Per això entra en aquest correu i no al següent. Context a §6.2 de la memòria:
+`DLN1.StockPrice` és el cost congelat a la línia i SL no l'exposa; `GrossBuyPrice` coincidia 48 de 52.
 
 **Fet al nostre costat i ja al repositori:** Regla 04 i runbook §2.4 amb el `/100` acordat i el
 `discount` amb decisió per defecte **NO TOCAR RES** (`DISCOUNT_AS_PERCENT` a `'0'`); runbook pas **4b**,
