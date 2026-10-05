@@ -54,20 +54,49 @@ GO
    =========================================================================
    NO es CRD1.LineNum. KAIS numerava les adreces de cada client
    SEQUENCIALMENT des de 000; el LineNum de SAP es un numero de fila intern i
-   comenca on li toca (000, 006, 014...). Mesurat el 28/08/2026 contra
-   l'exportacio d'Analitza, sobre 4.689 clients:
+   comenca on li toca (000, 006, 014...).
 
-       amb CRD1.LineNum      ->   283 clients quadren  (6%)
-       renumerant 0,1,2...   -> 4.647 clients quadren  (99,1%)
+   TRES MESURAMENTS, EN AQUEST ORDRE. La seqüencia importa mes que el resultat:
+   cadascun semblava tancar el tema.
 
-   Per que no es va veure abans: la sonda de Fase 0 va donar 534/534
-   coincidencies, pero contra baseline.est_clients, que a l'entorn de test es
-   sortida del pipeline antic ja apuntat a SAP. Comparava SAP amb SAP i el que
-   demostrava es que BPAddress.RowNum == CRD1.LineNum, no que cap dels dos fos
-   el numero que KAIS va donar a Analitza.
+   1) Fase 0, contra baseline.est_clients     ->   534 / 534   (100%)
+      Fals. baseline es sortida del pipeline ANTIC ja apuntat a SAP, aixi que
+      comparava SAP amb SAP. El que demostrava es que BPAddress.RowNum ==
+      CRD1.LineNum, no que cap dels dos fos el numero que KAIS va donar a
+      Analitza.
 
-   EL NUMERO JA NO ES CALCULA, ES LLEGEIX (01/09/2026)
-   ---------------------------------------------------
+   2) 28/08/2026, contra l'exportacio d'Analitza, per CLIENT (4.689 clients)
+         amb CRD1.LineNum      ->   283 clients quadren  (6%)
+         renumerant 0,1,2...   -> 4.647 clients quadren  (99,1%)
+      Aquell 99,1% va fer tancar el tema, i era enganyos: es mesurava per
+      CLIENT, i la immensa majoria de clients tenen UNA sola adreça, aixi que
+      quadren amb qualsevol regla. El dany viu nomes als clients amb diverses
+      adreces, que son els que no es veien.
+
+   3) 29/09/2026, contra l'exportacio d'Analitza, per ADREÇA (5.618 adreces
+      de ship-to amb codi postal a SAP). La va destapar la comparativa que
+      l'Adria va enviar el 25/09:
+         renumerant 0,1,2...        -> 4.923 zips quadren  (87,6%)
+         el prefix NNN- de Address  -> 5.574 zips quadren  (99,2%)
+      i de les 804 adreces que van canviar de numero: 132 quadraven, 786
+      quadren. La consulta viu a sql\verify_ship_no.sql.
+
+   EL NUMERO DE KAIS ES AL NOM DE L'ADREÇA DE SAP
+   ----------------------------------------------
+   La migracio KAIS->SAP va escriure CRD1.Address (el NOM de l'adreça, no el
+   carrer) amb el format 'NNN-<nom del client>-<abreviatura de ciutat>':
+
+       C251271 / LineNum 4   ->  '000-CREATIVE FOODING SL-BARCELONA'
+       C251271 / LineNum 12  ->  '002-CREATIVE FOODING SL-BARCELONA'
+       C251271 / LineNum 14  ->  '001-CREATIVE FOODING SL-BARCELONA'
+
+   Aquell NNN es el numero que Analitza te a l'historic. Renumerar 0,1,2... per
+   LineNum el permutava: aquest client emetia 000/001/002 amb els continguts
+   000/002/001, i Analitza no ho veu com un error -veu un client que ha comprat
+   coses que no ha comprat mai, i totes les xifres quadren amb elles mateixes.
+
+   EL NUMERO NO ES CALCULA, ES LLEGEIX (01/09/2026, corregit el 29/09/2026)
+   -----------------------------------------------------------------------
    Calcular-lo al vol amb ROW_NUMBER() feia que esborrar una adreça renumeres
    totes les posteriors del mateix client. L'Adria va explicar que aixo, al seu
    costat, no deixa un forat sino que **enganxa l'historic d'una adreça a una
@@ -76,13 +105,76 @@ GO
    adreça amb aquell numero, se l'emporta tot.
 
    Ara el numero viu a cfg.client_ship_no, que l'assigna una sola vegada i no
-   el torna a tocar (etl.sp_assign_client_ship_no).
+   el torna a tocar (etl.sp_assign_client_ship_no). El 01/09 s'hi va congelar
+   el ROW_NUMBER(); el 29/09 es va re-congelar amb el prefix
+   (sql\migrations\2026-09-29_ship_no_from_address_prefix.sql).
 
    INNER JOIN a proposit: una adreça sense numero congelat NO ha de sortir amb
    un numero inventat. Que desaparegui es visible -el check ship_no_missing la
    caça i vanished_ids tambe-, mentre que inventar-lo seria silencios i
    trencaria justament el que aixo protegeix.
    ========================================================================= */
+
+/* La regla del prefix, en un sol lloc.
+   =========================================================================
+   Se'n serveixen la migracio que va re-congelar la taula,
+   etl.sp_assign_client_ship_no (adreces noves) i el check
+   ship_no_prefix_mismatch. Repetir-la seria el mateix error que va fer neixer
+   etl.vw_client_code: la formula de l'identificador copiada a vuit llocs.
+
+   LA COMETA INICIAL
+   -----------------
+   Sis adreces tenen el nom amb escapament CSV de la migracio KAIS->SAP:
+
+       '"000-PRODUCTES ""EL DE CALDES, S.A.""-PSIP"'
+
+   La cometa del davant tapa el prefix i les convertia en falsos negatius del
+   patro. Es treu NOMES la cometa, que es l'unic artefacte mesurat. Qualsevol
+   altre prefix ('DESHABILITAT__', 'test', 'Ship To') NO es treu: cau al cami
+   de MAX+1 i el check master_name_artifacts el fa visible. Un numero endevinat
+   es pitjor que un avis.
+
+   client_has_tie: el client te dues adreces amb el MATEIX prefix (tres clients
+   a 29/09/2026: C221503, C291071 i C432068, cadascun amb la mateixa adreça
+   introduida dues vegades sota el '000'). Qui consumeix aquesta vista ha de
+   decidir que en fa; la vista no tria per ell. La migracio, per exemple, deixa
+   aquests clients tal com estan.
+   ========================================================================= */
+CREATE OR ALTER VIEW etl.vw_client_ship_kais_no
+AS
+WITH addr AS (
+    SELECT  a.CardCode,
+            a.LineNum,
+            a.[Address],
+            /* nom sense la cometa inicial, que nomes hi es per l'escapament CSV */
+            clean = CASE WHEN LEFT(LTRIM(a.[Address]), 1) = N'"'
+                         THEN LTRIM(STUFF(LTRIM(a.[Address]), 1, 1, N''))
+                         ELSE LTRIM(a.[Address]) END
+    FROM    sap_raw.CRD1 AS a
+    WHERE   a.AdresType = 'S'
+), pref AS (
+    SELECT  d.CardCode,
+            d.LineNum,
+            d.[Address],
+            kais_no = CASE WHEN d.clean LIKE '[0-9][0-9][0-9]-%'
+                           THEN TRY_CONVERT(int, LEFT(d.clean, 3)) END
+    FROM    addr AS d
+)
+SELECT  p.CardCode,
+        p.LineNum,
+        p.[Address],
+        p.kais_no,
+        client_has_tie = CASE WHEN EXISTS (
+                                  SELECT 1
+                                  FROM   pref AS t
+                                  WHERE  t.CardCode = p.CardCode
+                                    AND  t.kais_no IS NOT NULL
+                                  GROUP BY t.kais_no
+                                  HAVING COUNT(*) > 1)
+                              THEN 1 ELSE 0 END
+FROM    pref AS p;
+GO
+
 CREATE OR ALTER VIEW etl.vw_client_ship
 AS
 SELECT  a.CardCode,
@@ -122,6 +214,9 @@ GO
    ---------------------
    Mesurat amb --probe el 10/09/2026 sobre DB_FARINERA_TEST, 160 clients de
    4.691 el porten informat, i la direccio es inequivoca:
+   (el nom es el d'aleshores: el 22/09/2026 la companyia de test va passar a
+   dir-se DB_FARIN_TEST, restaurada a partir d'aquella mateixa. La xifra no
+   s'ha tornat a mesurar, i per aixo el nom es queda com estava.)
 
        de client viu a client de baixa : 108
        de client de baixa a client viu :   2

@@ -30,10 +30,10 @@
       SQL Agent i el teu usuari nominal hi sortiran; el que ens interessa es
       si hi ha algun login creat expressament per a l'ETL.
    ------------------------------------------------------------------------- */
-USE [DB_FARINERA_TEST];
+USE [DB_FARIN_TEST];
 GO
 
-PRINT '--- Usuaris de DB_FARINERA_TEST i els seus rols ---';
+PRINT '--- Usuaris de DB_FARIN_TEST i els seus rols ---';
 
 SELECT  dp.name              AS usuari,
         dp.type_desc         AS tipus,
@@ -71,7 +71,7 @@ GO
    ------------------------------------------------------------------------- */
 
 /*
-USE [DB_FARINERA_TEST];
+USE [DB_FARIN_TEST];
 GO
 
 DECLARE @login sysname = N'<posa-hi-el-login-de-l-ETL>';
@@ -80,10 +80,10 @@ IF USER_ID(@login) IS NOT NULL
 BEGIN
     DECLARE @sql nvarchar(max) = N'DENY CONNECT TO ' + QUOTENAME(@login) + N';';
     EXEC sp_executesql @sql;
-    PRINT 'CONNECT denegat a ' + @login + ' sobre DB_FARINERA_TEST.';
+    PRINT 'CONNECT denegat a ' + @login + ' sobre DB_FARIN_TEST.';
 END
 ELSE
-    PRINT @login + ' no es usuari de DB_FARINERA_TEST: no hi ha res a revocar.';
+    PRINT @login + ' no es usuari de DB_FARIN_TEST: no hi ha res a revocar.';
 GO
 */
 
@@ -95,6 +95,6 @@ GO
 
 /*
 EXECUTE AS LOGIN = N'<posa-hi-el-login-de-l-ETL>';
-SELECT TOP 1 CardCode FROM [DB_FARINERA_TEST].dbo.OCRD;   -- ha de petar
+SELECT TOP 1 CardCode FROM [DB_FARIN_TEST].dbo.OCRD;   -- ha de petar
 REVERT;
 */

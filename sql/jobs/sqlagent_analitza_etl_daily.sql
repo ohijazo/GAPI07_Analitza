@@ -5,7 +5,7 @@
    Step 1 : EXEC IntercanviSAP.etl.sp_run_all (transforma sap_raw -> est_*)
 
    El mirall sap_raw el refresca SapB1AnalitzaSync.Worker, que corre com a
-   tasca programada a AE01SAPRDP a les 02:45. NO es un pas d'aquest job: SQL
+   tasca programada a AE02SAPRDP a les 02:45. NO es un pas d'aquest job: SQL
    Agent no pot llancar un proces en una altra maquina.
    On fail : sp_send_dbmail a l'operador "AnalitzaOps".
 
@@ -13,7 +13,7 @@
    sino la guarda de frescor de sp_run_all (cfg.settings.MIRROR_MAX_AGE_HOURS).
 
    Pre-requisits:
-     - La tasca del Worker corrent a AE01SAPRDP i acabada abans de les 03:00.
+     - La tasca del Worker corrent a AE02SAPRDP i acabada abans de les 03:00.
      - Database Mail configurat amb un profile (es passa en @notify_email_operator_name).
      - Operator "AnalitzaOps" creat amb una addreca d'email valida (vegeu seccio
        opcional al final). Si no es vol notificacio per email, comentar la linia
@@ -44,7 +44,7 @@ IF EXISTS (SELECT 1 FROM dbo.sysjobs WHERE name = @JobName)
 
 EXEC dbo.sp_add_job
     @job_name = @JobName,
-    @description = N'Carga diaria de Analitza: transforma sap_raw a est_*. El mirall el refresca el Worker a AE01SAPRDP a les 02:45.',
+    @description = N'Carga diaria de Analitza: transforma sap_raw a est_*. El mirall el refresca el Worker a AE02SAPRDP a les 02:45.',
     @enabled = 1,
     @notify_level_eventlog = 0,
     @notify_level_email    = 2,                  -- 2 = on failure
@@ -57,7 +57,7 @@ EXEC dbo.sp_add_jobserver
 
 /* Un sol pas: el Worker ja no s'executa des d'aqui.
 
-   Corre com a tasca programada a AE01SAPRDP (servidor d'aplicacions) a les
+   Corre com a tasca programada a AE02SAPRDP (servidor d'aplicacions) a les
    02:45. Son dos planificadors que no es parlen, aixi que la garantia de no
    transformar un mirall vell no la dona l'ordre dels passos sino la guarda de
    frescor de sp_run_all: si sap_raw.sync_state te mes de
@@ -99,6 +99,6 @@ EXEC dbo.sp_add_jobschedule
     @active_start_time = 030000;
 
 PRINT 'Job Analitza_ETL_Daily creat (1 pas: ETL, com a gapi07_etl).';
-PRINT 'El mirall el refresca el Worker a AE01SAPRDP, com a tasca programada a les 02:45.';
+PRINT 'El mirall el refresca el Worker a AE02SAPRDP, com a tasca programada a les 02:45.';
 PRINT 'Si no ha corregut, sp_run_all avorta amb ABORTED_STALE_MIRROR.';
 GO

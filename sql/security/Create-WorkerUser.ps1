@@ -13,7 +13,7 @@
 #   .\Create-WorkerUser.ps1
 #
 # Despres d'executar-lo, apunta la contrasenya del worker al gestor de
-# contrasenyes: la necessitaras per a l'appsettings.json de AE01SAPRDP i no hi
+# contrasenyes: la necessitaras per a l'appsettings.json de AE02SAPRDP i no hi
 # ha manera de recuperar-la.
 #
 # AVIS: com que reaplica la contrasenya sempre, si el Worker ja esta desplegat
@@ -26,6 +26,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Les BD de SAP d'aquest servidor: aqui nomes hi entrem per denegar-hi CONNECT.
+# DB_FARIN_TEST es la companyia de test des del 22/09/2026; DB_FARINERA_TEST es
+# la d'abans, que el 22/09/2026 ja estava OFFLINE. DB_FARINERA (sense sufix) es
+# una altra BD de SAP d'aquest servidor, ONLINE. Cap d'elles s'ha de poder
+# obrir des d'aqui; el try/catch de sota tolera que no hi siguin o siguin
+# OFFLINE.
+$SapDatabases = @('DB_FARIN_TEST', 'DB_FARINERA', 'DB_FARINERA_TEST')
 
 function Read-Plain([string]$prompt) {
     $sec = Read-Host $prompt -AsSecureString
@@ -131,12 +139,20 @@ IF USER_ID('$Login') IS NOT NULL DROP USER [$Login];
 "@
     Write-Host "  master: sense usuari ni DENY (si n'hi havia, esborrat)" -ForegroundColor Green
 
-    foreach ($db in @('DB_FARINERA_TEST')) {
-        Exec $db @"
+    foreach ($db in $SapDatabases) {
+        try {
+            Exec $db @"
 IF USER_ID('$Login') IS NULL CREATE USER [$Login] FOR LOGIN [$Login];
 DENY CONNECT TO [$Login];
 "@
-        Write-Host "  DENY CONNECT a $db" -ForegroundColor Green
+            Write-Host "  DENY CONNECT a $db" -ForegroundColor Green
+        } catch {
+            # Una BD de la llista que ja no hi sigui -- o que sigui OFFLINE,
+            # com DB_FARINERA_TEST des del 22/09/2026 -- no ha d'aturar
+            # l'script: sense aixo peta aqui i els permisos queden mig
+            # aplicats.
+            Write-Host "  $db : no s'ha pogut ($($_.Exception.Message))" -ForegroundColor Yellow
+        }
     }
 
     # Comprovacio CONNECTANT-S'HI de debo, no impersonant.
@@ -173,6 +189,16 @@ SELECT CAST(@ok_sapraw AS int) AS pot_llegir_sap_raw, CAST(@ok_dbo_denegat AS in
         }
         $rd.Close()
         $test.Close()
+
+        foreach ($db in $SapDatabases) {
+            try {
+                $sap = New-SqlConn $Server $db $Login $newPwd
+                $sap.Open(); $sap.Close()
+                Write-Host ("  Entra a {0} : SI -- malament, revisa el DENY CONNECT" -f $db) -ForegroundColor Red
+            } catch {
+                Write-Host ("  Entra a {0} : no (correcte)" -f $db)
+            }
+        }
     }
     catch {
         $e = $_.Exception
@@ -187,7 +213,7 @@ SELECT CAST(@ok_sapraw AS int) AS pot_llegir_sap_raw, CAST(@ok_dbo_denegat AS in
 
     Write-Host ""
     Write-Host "Fet. Apunta la contrasenya al gestor: la necessitaras per a" -ForegroundColor Yellow
-    Write-Host "l'appsettings.json de AE01SAPRDP i no es pot recuperar." -ForegroundColor Yellow
+    Write-Host "l'appsettings.json de AE02SAPRDP i no es pot recuperar." -ForegroundColor Yellow
 }
 finally {
     $conn.Close()

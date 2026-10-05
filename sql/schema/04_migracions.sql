@@ -188,3 +188,110 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'RECEIVABLES_IN_USE')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('RECEIVABLES_IN_USE', '0', 'Analitza importa est_cobraments? 0 = no (el check receivables_empty es WARN i no atura el swap); 1 = si (torna a ser CRITICAL). A 0 des del 17/09/2026 per confirmacio de l Adria. Revisar-ho despres del cutover: la SAP productiva nomes porta factures realment pendents, aixi que el motiu pel qual la van desactivar no travessa el tall.');
 GO
+
+/* -------------------------------------------------------------------------
+   2026-09-29 - el numero d'adreça surt del prefix NNN- de CRD1.Address
+
+   El 01/09/2026 es va congelar el numero d'adreça a cfg.client_ship_no amb
+       ROW_NUMBER() OVER (PARTITION BY CardCode ORDER BY LineNum)
+   i el 29/09 es va veure que aquell numero NO era el de KAIS. El de KAIS es al
+   NOM de l'adreça de SAP ('003-SANT QUIRZE-ST. QUIRZE'), que hi va escriure la
+   migracio KAIS->SAP. Mesurat contra l'exportacio d'Analitza, sobre 5.572
+   adreces de ship-to amb codi postal:
+
+       renumerant 0,1,2...        -> 4.923 zips quadren  (87,6%)
+       el prefix NNN- de Address  -> 5.574 zips quadren  (99,2%)
+
+   i, mirant nomes les 804 adreces que van canviar de numero, el zip de KAIS
+   quadrava amb el de SAP en 132 i despres en 786. El residu no son errors de
+   numeracio: son adreces que a KAIS no tenien codi postal, zeros al davant
+   (080057 contra 80057) i una adreça que a SAP ha canviat de ciutat. La
+   consulta que ho torna a mesurar es sql\verify_ship_no.sql.
+
+   Veure el capcal de etl.vw_client_ship_kais_no a procs\etl_vw_kais_codes.sql.
+
+   AQUI NOMES HI HA L'ESQUEMA. El canvi de dades viu a
+       sql\migrations\2026-09-29_ship_no_from_address_prefix.sql
+   i NO es crida des de deploy.sql, expressament: aquest fitxer s'executa a cada
+   desplegament i renumerar reassigna ~800 id_client_location. Un desplegament
+   rutinari no ha de poder disparar-ho.
+
+   LA DIVISIO, PER SI TORNA A CALDRE
+   ---------------------------------
+     schema\04_migracions.sql  -> canvis d'ESQUEMA, idempotents i automatics.
+     sql\migrations\*.sql      -> canvis de DADES sobre estat no regenerable.
+                                  Un sol cop, a ma, i mirant la sortida.
+   ------------------------------------------------------------------------- */
+IF COL_LENGTH('cfg.client_ship_no', 'ship_no_prev') IS NULL
+    ALTER TABLE cfg.client_ship_no ADD ship_no_prev int NULL;
+GO
+
+IF COL_LENGTH('cfg.client_ship_no', 'renumbered_at') IS NULL
+    ALTER TABLE cfg.client_ship_no ADD renumbered_at datetime2(3) NULL;
+GO
+
+/* D'on surt el numero: PREFIX (el NNN- del nom d'adreça de SAP, el bo),
+   ROWNUMBER (el calcul del 01/09, pendent de corregir), MAXPLUS1 (adreça nova
+   sense numero de KAIS) o TIE_EXCLUDED (client amb dues adreces sota el mateix
+   prefix: es queda com estava a proposit). */
+IF COL_LENGTH('cfg.client_ship_no', 'ship_no_source') IS NULL
+    ALTER TABLE cfg.client_ship_no ADD ship_no_source varchar(24) NULL;
+GO
+
+/* -------------------------------------------------------------------------
+   cfg.migrations_applied - registre dels canvis de dades d'un sol us
+
+   Els fitxers de sql\migrations\ s'executen a ma i han de ser idempotents: la
+   primera guarda de cadascun es mirar si ja consta aqui. Sense aixo, la
+   idempotencia dependria de recordar-ho.
+   ------------------------------------------------------------------------- */
+IF OBJECT_ID('cfg.migrations_applied') IS NULL
+CREATE TABLE cfg.migrations_applied (
+    migration_name  varchar(120)  NOT NULL CONSTRAINT PK_cfg_migrations_applied PRIMARY KEY,
+    applied_at      datetime2(3)  NOT NULL CONSTRAINT DF_cfg_migr_at DEFAULT SYSUTCDATETIME(),
+    applied_by      nvarchar(128) NOT NULL CONSTRAINT DF_cfg_migr_by DEFAULT SUSER_SNAME(),
+    rows_affected   bigint        NULL,
+    notes           nvarchar(max) NULL
+);
+GO
+
+/* -------------------------------------------------------------------------
+   audit.client_ship_no_changes - quin id_client_location era quin
+
+   No es redundant amb ship_no_prev de la fila. La columna nomes guarda UN
+   valor anterior i una segona renumeracio el trepitjaria; i sobretot, aixo es
+   d'on surt el mapatge que Analitza necessita.
+
+   PER QUE ANALITZA EL NECESSITA: quan els deixa d'arribar un client_location
+   l'esborren de l'aplicacio pero MANTENEN l'historic d'albarans (correu de
+   l'Adria, 01/09/2026). O sigui que renumerar no els deixa un forat: els deixa
+   l'historic enganxat al numero antic i el numero nou buit. Per aixo id_old i
+   id_new es guarden ja construits amb etl.vw_client_code: el que se li passa
+   ha de ser exactament el que ell te a la seva BD, sense que ningu hagi de
+   tornar a muntar la formula del contracte a ma (Regla 04).
+   ------------------------------------------------------------------------- */
+IF OBJECT_ID('audit.client_ship_no_changes') IS NULL
+CREATE TABLE [audit].client_ship_no_changes (
+    change_id       bigint IDENTITY(1,1) CONSTRAINT PK_audit_client_ship_no_changes PRIMARY KEY,
+    migration_name  varchar(120)  NOT NULL,
+    changed_at      datetime2(3)  NOT NULL CONSTRAINT DF_audit_csnc_at DEFAULT SYSUTCDATETIME(),
+    CardCode        nvarchar(15)  NOT NULL,
+    LineNum         int           NOT NULL,
+    ship_no_old     int           NOT NULL,
+    ship_no_new     int           NOT NULL,
+    [Address]       nvarchar(50)  NULL,
+    reason          varchar(24)   NOT NULL,
+    id_old          varchar(13)   NULL,
+    id_new          varchar(13)   NULL
+);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ALLOW_SHIP_NO_RENUMBER')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('ALLOW_SHIP_NO_RENUMBER', '0', 'Permis d un sol us perque sql\migrations\2026-09-29_ship_no_from_address_prefix.sql pugui reassignar numeros a cfg.client_ship_no. Aquella taula es estat NO regenerable i reassignar-hi numeros es precisament l operacio que el disseny prohibeix: nomes es fa des d aquell script, un sol cop i mirant la sortida. El propi script el torna a 0.');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'SHIP_NO_PREFIX_BASELINE')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('SHIP_NO_PREFIX_BASELINE', '', 'Quantes adreces queden legitimament amb el prefix NNN- diferent del ship_no congelat (els clients amb dues adreces sota el mateix prefix). L escriu la migracio de re-congelacio, NO es toca a ma: es el mateix patro que DISCOUNT_AS_PERCENT_PUBLISHED. El check ship_no_prefix_mismatch hi compara; buit vol dir que encara no s ha renumerat, i llavors el check nomes avisa.');
+GO

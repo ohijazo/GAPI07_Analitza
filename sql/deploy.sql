@@ -11,6 +11,14 @@
    sencer hauria deixat Analitza sense dades. Els canvis d'esquema sobre una BD
    viva van a schema\04_migracions.sql, que si que es crida.
 
+   NO inclou res de sql/migrations/. Aquella carpeta son canvis de DADES sobre
+   estat que no es pot regenerar -avui, cfg.client_ship_no-, s'executen a MA una
+   sola vegada i mirant la sortida. Posar-los aqui voldria dir que un
+   desplegament rutinari pot reassignar ~800 id_client_location sense que ningu
+   hagi posat @ForceFullLines=1. La divisio:
+       schema/04_migracions.sql  -> ESQUEMA, idempotent i automatic.
+       sql/migrations/*.sql      -> DADES, un sol cop, a ma, amb permis explicit.
+
    NO inclou schema\03_create_baseline.sql: la fotografia de referencia es
    pren UNA sola vegada, a ma, abans del tall a Service Layer. Veure el
    capcal d'aquell fitxer.

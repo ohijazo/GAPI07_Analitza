@@ -31,7 +31,7 @@
 USE master;
 GO
 
-/* SAP B1 (DB_FARINERA_TEST) ve instal.lat amb SQL_Latin1_General_CP850_CI_AS.
+/* SAP B1 (DB_FARIN_TEST) ve instal.lat amb SQL_Latin1_General_CP850_CI_AS.
    Mantenim la mateixa collation per evitar conflictes en JOINs cross-DB. */
 IF DB_ID('IntercanviSAP') IS NULL
 BEGIN
@@ -395,6 +395,31 @@ CREATE TABLE [audit].etl_step_log (
 );
 GO
 
+/* -------------------------------------------------------------------------
+   audit.client_ship_no_changes - quin id_client_location era quin
+
+   L'omplen els fitxers de sql\migrations\ quan reassignen un numero d'adreça.
+   No es redundant amb cfg.client_ship_no.ship_no_prev: la columna nomes guarda
+   UN valor anterior, i aixo es d'on surt el mapatge id_antic -> id_nou que
+   Analitza necessita per repuntar el seu historic (veure el capcal de
+   schema\04_migracions.sql, seccio del 29/09/2026).
+   ------------------------------------------------------------------------- */
+IF OBJECT_ID('audit.client_ship_no_changes') IS NULL
+CREATE TABLE [audit].client_ship_no_changes (
+    change_id       bigint IDENTITY(1,1) CONSTRAINT PK_audit_client_ship_no_changes PRIMARY KEY,
+    migration_name  varchar(120)  NOT NULL,
+    changed_at      datetime2(3)  NOT NULL CONSTRAINT DF_audit_csnc_at DEFAULT SYSUTCDATETIME(),
+    CardCode        nvarchar(15)  NOT NULL,
+    LineNum         int           NOT NULL,
+    ship_no_old     int           NOT NULL,
+    ship_no_new     int           NOT NULL,
+    [Address]       nvarchar(50)  NULL,
+    reason          varchar(24)   NOT NULL,
+    id_old          varchar(13)   NULL,
+    id_new          varchar(13)   NULL
+);
+GO
+
 IF OBJECT_ID('audit.data_quality_warnings') IS NULL
 CREATE TABLE [audit].data_quality_warnings (
     warning_id  bigint        IDENTITY(1,1) PRIMARY KEY,
@@ -443,6 +468,22 @@ CREATE TABLE cfg.attribute_mapping (
 GO
 
 /* -------------------------------------------------------------------------
+   cfg.migrations_applied - registre dels canvis de dades d'un sol us
+
+   Els fitxers de sql\migrations\ s'executen a ma i han de ser idempotents: la
+   primera guarda de cadascun es mirar si ja consta aqui.
+   ------------------------------------------------------------------------- */
+IF OBJECT_ID('cfg.migrations_applied') IS NULL
+CREATE TABLE cfg.migrations_applied (
+    migration_name  varchar(120)  NOT NULL CONSTRAINT PK_cfg_migrations_applied PRIMARY KEY,
+    applied_at      datetime2(3)  NOT NULL CONSTRAINT DF_cfg_migr_at DEFAULT SYSUTCDATETIME(),
+    applied_by      nvarchar(128) NOT NULL CONSTRAINT DF_cfg_migr_by DEFAULT SUSER_SNAME(),
+    rows_affected   bigint        NULL,
+    notes           nvarchar(max) NULL
+);
+GO
+
+/* -------------------------------------------------------------------------
    cfg.client_ship_no - la meitat dreta de id_client_location, congelada
 
    NO ES UNA TAULA DERIVADA: es estat que no es pot regenerar. Si es perd, tots
@@ -460,6 +501,12 @@ CREATE TABLE cfg.client_ship_no (
     ship_no    int           NOT NULL,
     [Address]  nvarchar(50)  NULL,
     frozen_at  datetime2(3)  NOT NULL CONSTRAINT DF_cfg_client_ship_no_frozen DEFAULT SYSUTCDATETIME(),
+    /* Rastre de la re-congelacio del 29/09/2026, quan es va descobrir que el
+       numero de KAIS era al prefix NNN- del nom d'adreça de SAP i no el que
+       havia calculat el ROW_NUMBER(). Veure schema\04_migracions.sql. */
+    ship_no_prev    int          NULL,
+    renumbered_at   datetime2(3) NULL,
+    ship_no_source  varchar(24)  NULL,   -- PREFIX / ROWNUMBER / MAXPLUS1 / TIE_EXCLUDED
     CONSTRAINT PK_cfg_client_ship_no PRIMARY KEY CLUSTERED (CardCode, LineNum),
     /* Dues adreces del mateix client no poden compartir numero: si passes,
        dos id_client_location diferents col.lapsarien en un. */
@@ -543,6 +590,14 @@ IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'RECEIVABLES_IN_USE')
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'HISTORY_FLOOR_ENFORCE')
     INSERT cfg.settings ([key], [value], description)
     VALUES ('HISTORY_FLOOR_ENFORCE', '1', 'Atura el swap si la data mes antiga de staging.est_linies_albara es anterior a la de dbo. Analitza reemplaça el seu historic a partir de la data minima que li enviem, aixi que fer-la retrocedir els esborra dades. Nomes es posa a 0 per a un backfill volgut, i es torna a 1 tot seguit.');
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'ALLOW_SHIP_NO_RENUMBER')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('ALLOW_SHIP_NO_RENUMBER', '0', 'Permis d un sol us perque sql\migrations\2026-09-29_ship_no_from_address_prefix.sql pugui reassignar numeros a cfg.client_ship_no, que es estat NO regenerable. El propi script el torna a 0.');
+
+IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'SHIP_NO_PREFIX_BASELINE')
+    INSERT cfg.settings ([key], [value], description)
+    VALUES ('SHIP_NO_PREFIX_BASELINE', '', 'Quantes adreces queden legitimament amb el prefix NNN- diferent del ship_no congelat. L escriu la migracio de re-congelacio, NO es toca a ma. El check ship_no_prefix_mismatch hi compara; buit = encara no s ha renumerat.');
 
 IF NOT EXISTS (SELECT 1 FROM cfg.settings WHERE [key] = 'FULL_RELOAD_WEEKDAY')
     INSERT cfg.settings ([key], [value], description)

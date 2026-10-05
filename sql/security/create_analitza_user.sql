@@ -95,15 +95,53 @@ IF USER_ID('analitza_ro') IS NULL
 DENY CONNECT TO analitza_ro;
 GO
 
-USE [DB_FARINERA_TEST];
-GO
-IF USER_ID('analitza_ro') IS NULL
-    CREATE USER analitza_ro FOR LOGIN analitza_ro;
-DENY CONNECT TO analitza_ro;
-GO
+/* Cap acces a la resta de bases de dades del servidor, incloent-hi SAP.
 
-/* Al cutover, el mateix per a DB_FARINERA_PROD. No hi es perque en aquest
-   servidor encara no existeix i el script ha de poder correr. */
+   Va per sp_executesql perque USE no es pot posar dins d'un IF, i sense la
+   guarda de DB_ID el dia que donin de baixa una d'aquestes bases de dades el
+   script peta aqui i deixa els permisos a mig aplicar. Tot script de sql/ ha
+   de ser idempotent (Regla 05).
+
+   El QUOTENAME d'aqui NO es la regressio que prohibeix la Regla 01: alla es
+   tracta de SPs que consulten taules de SAP amb el nom de la companyia
+   interpolat. Aixo es DDL de seguretat, i el que fa es justament tancar
+   l'acces a aquelles bases de dades. */
+DECLARE @sapdb TABLE (name sysname PRIMARY KEY);
+INSERT @sapdb (name) VALUES (N'DB_FARIN_TEST'), (N'DB_FARINERA'), (N'DB_FARINERA_TEST');
+/* DB_FARIN_TEST es la companyia de test des del 22/09/2026. DB_FARINERA_TEST
+   es la d'abans: el 22/09/2026 ja estava OFFLINE, i es queda a la llista fins
+   que la treguin del servidor.
+
+   DB_FARINERA (sense sufix) es una BD de SAP d'aquest mateix servidor, ONLINE
+   des del 13/03/2026. Hi va el DENY pel mateix motiu que a les altres. OJO: la
+   documentacio del projecte dona per fet que la companyia productiva es dira
+   DB_FARINERA_PROD, i aqui no hi ha cap BD amb aquest nom -- s'ha de confirmar
+   quina es abans del cutover, i afegir-la aqui si resulta ser una altra. */
+
+DECLARE @db sysname, @sql nvarchar(max);
+WHILE EXISTS (SELECT 1 FROM @sapdb)
+BEGIN
+    SELECT TOP 1 @db = name FROM @sapdb ORDER BY name;
+    DELETE FROM @sapdb WHERE name = @db;
+
+    /* Ha de ser ONLINE, no nomes existir: DB_ID() retorna un id per a una BD
+       OFFLINE i el USE de sota peta igualment. DB_FARINERA_TEST ja estava
+       OFFLINE el 22/09/2026, aixi que aquest cas no es hipotetic. */
+    IF NOT EXISTS (SELECT 1 FROM sys.databases
+                   WHERE name = @db AND state_desc = 'ONLINE')
+    BEGIN
+        PRINT @db + ': no hi es o no esta ONLINE, res a denegar.';
+        CONTINUE;
+    END
+
+    SET @sql = N'USE ' + QUOTENAME(@db) + N';
+IF USER_ID(''analitza_ro'') IS NULL
+    CREATE USER analitza_ro FOR LOGIN analitza_ro;
+DENY CONNECT TO analitza_ro;';
+    EXEC sp_executesql @sql;
+    PRINT 'CONNECT denegat a analitza_ro sobre ' + @db + '.';
+END
+GO
 
 /* 4. Verificacio -------------------------------------------------------- */
 USE IntercanviSAP;

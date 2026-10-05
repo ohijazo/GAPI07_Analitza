@@ -494,6 +494,160 @@ BEGIN
                     + '. La vista n emet un de sol; la resta no arriben a Analitza.');
         END
 
+        /* ----- 15) El numero d'adreça ja no es el de KAIS (WARN / CRITICAL) -----
+
+           El ship_no congelat a cfg.client_ship_no ha de coincidir amb el prefix
+           NNN- del nom de l'adreça de SAP, que es el numero que KAIS va donar a
+           Analitza. Aquest check es el que hauria caçat el bug de l'01/09/2026:
+           es va congelar el ROW_NUMBER() en comptes del prefix i durant quatre
+           setmanes 804 ubicacions van apuntar a l'adreça equivocada, amb totes
+           les xifres quadrant amb elles mateixes.
+
+           PER QUE NO ES CRITICAL SEC: despres de la re-congelacio el recompte no
+           es 0, es el dels clients que tenen dues adreces sota el mateix prefix,
+           que es queden com estaven a proposit. Un CRITICAL sec bloquejaria el
+           swap cada nit per sempre.
+
+           PER QUE ES COMPARA CONTRA UN SETTING: SHIP_NO_PREFIX_BASELINE l'escriu
+           la migracio de re-congelacio, no una ma -mateix patro que
+           DISCOUNT_AS_PERCENT_PUBLISHED-. Aixi el check s'arma tot sol, i mentre
+           el setting sigui buit (encara no s'ha renumerat) nomes avisa: es poden
+           desplegar els checks abans de migrar sense deixar el primer run
+           BLOCKED amb 804 descuadrats.
+
+           PER QUE EL MARGE ES ID_DROP_MAX i no un dial nou: el dany que vigila
+           aixo ES "identificadors que es mouen", que es el que ID_DROP_MAX
+           mesura. I te una propietat util: el dia que es renumeri expressament,
+           ID_DROP_MAX ja estara obert i el check es relaxara el dia correcte.
+
+           QUE PROTEGEIX DE DEBO: que algu restauri cfg.client_ship_no d'un
+           backup anterior a la re-congelacio, o la refaci. En aquell cas
+           ship_no_missing NO salta -les files hi son- i vanished_ids salta un
+           sol dia i despres calla. L'unic senyal que queda es aquest. -----*/
+        DECLARE @pfx_baseline int, @pfx_margin int;
+        SELECT @pfx_baseline = TRY_CAST(NULLIF([value], '') AS int)
+        FROM   cfg.settings WHERE [key] = 'SHIP_NO_PREFIX_BASELINE';
+        SELECT @pfx_margin = TRY_CAST([value] AS int)
+        FROM   cfg.settings WHERE [key] = 'ID_DROP_MAX';
+        SET @pfx_margin = ISNULL(@pfx_margin, 10);
+
+        SELECT @cnt = COUNT(*)
+        FROM   cfg.client_ship_no AS f
+        INNER JOIN etl.vw_client_ship_kais_no AS k
+                ON k.CardCode = f.CardCode AND k.LineNum = f.LineNum
+        WHERE  k.kais_no IS NOT NULL
+          AND  k.kais_no <> f.ship_no;
+
+        IF @cnt > 0
+        BEGIN
+            DECLARE @pfx_detail nvarchar(max) =
+                'Adreces on el numero congelat no es el prefix NNN- del nom d adreça de SAP: '
+                + CAST(@cnt AS varchar(20))
+                + ' (baseline esperat: ' + ISNULL(CAST(@pfx_baseline AS varchar(20)), 'sense armar')
+                + '). El prefix es el numero que KAIS va donar a Analitza; si no coincideix, '
+                + 'aquelles ubicacions porten l historic d una altra adreça. ';
+            SELECT TOP 10 @pfx_detail = @pfx_detail
+                   + RTRIM(f.CardCode) + ': congelat=' + CAST(f.ship_no AS varchar(10))
+                   + ' prefix=' + CAST(k.kais_no AS varchar(10))
+                   + ' (' + ISNULL(k.[Address], '') + ') '
+            FROM   cfg.client_ship_no AS f
+            INNER JOIN etl.vw_client_ship_kais_no AS k
+                    ON k.CardCode = f.CardCode AND k.LineNum = f.LineNum
+            WHERE  k.kais_no IS NOT NULL AND k.kais_no <> f.ship_no
+            ORDER BY f.CardCode, f.ship_no;
+
+            IF @pfx_baseline IS NOT NULL AND @cnt - @pfx_baseline > @pfx_margin
+            BEGIN
+                INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+                VALUES (@rid, 'ship_no_prefix_mismatch', 'CRITICAL',
+                        @pfx_detail + '. Passa de ' + CAST(@pfx_baseline AS varchar(20))
+                        + ' + ' + CAST(@pfx_margin AS varchar(20))
+                        + ' (ID_DROP_MAX): algu ha tocat cfg.client_ship_no. Swap avortat.');
+                SET @CriticalCount = @CriticalCount + 1;
+            END
+            ELSE
+                INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+                VALUES (@rid, 'ship_no_prefix_mismatch', 'WARN', @pfx_detail);
+        END
+
+        /* ----- 16) Artefactes de la migracio a les dades mestres (WARN) -----
+
+           Existeix perque UNA COMETA VA AMAGAR CINC ADRECES. La migracio
+           KAIS->SAP va escriure valors amb escapament CSV dins de SAP:
+
+               '"000-PRODUCTES ""EL DE CALDES, S.A.""-PSIP"'
+
+           i aquella cometa del davant tapava el prefix NNN-, que des del
+           29/09/2026 es el numero d'adreça. O sigui que la dada mestra de SAP ha
+           passat a ser load-bearing i mereix un senyal.
+
+           El prefix 'DESHABILITAT__' als correus es de l'scrubbing de la
+           companyia de TEST i ha de desapareixer a la productiva. Si algun dia
+           surt a la productiva, vol dir que algu hi ha carregat dades de test.
+
+           PER QUE NOMES WARN: aquests valors van a camps de TEXT (name,
+           address), no a identificadors, i una cometa no trenca cap JOIN.
+           Bloquejar el swap per tipografia deixaria Analitza sense clients,
+           productes i linies una nit sencera; el mateix raonament amb que
+           receivables_empty va baixar a WARN el 17/09/2026. I l'arreglada no es
+           nostra: es a la dada mestra de SAP.
+
+           Per aixo el detall porta els valors CONCRETS: qui obri el tiquet als
+           consultors ha de poder-los enganxar sense reconstruir la consulta.
+
+           Nota: 'DESHABILITAT[_][_]' amb claudators a proposit. El _ es un
+           comodi de LIKE i sense escapar casaria de mes. -----*/
+        IF OBJECT_ID('tempdb..#artifact') IS NOT NULL DROP TABLE #artifact;
+        CREATE TABLE #artifact (
+            entity varchar(20)   COLLATE DATABASE_DEFAULT NOT NULL,
+            [key]  nvarchar(60)  COLLATE DATABASE_DEFAULT NOT NULL,
+            val    nvarchar(300) COLLATE DATABASE_DEFAULT NULL,
+            kind   varchar(12)   COLLATE DATABASE_DEFAULT NOT NULL
+        );
+
+        INSERT #artifact (entity, [key], val, kind)
+        SELECT 'CRD1.Address', RTRIM(CardCode) + '/' + CAST(LineNum AS varchar(10)), [Address],
+               CASE WHEN [Address] LIKE N'%' + CHAR(34) + '%' THEN 'CSV' ELSE 'TEST' END
+        FROM   sap_raw.CRD1
+        WHERE  AdresType = 'S'
+          AND  ([Address] LIKE N'%' + CHAR(34) + '%' OR [Address] LIKE 'DESHABILITAT[_][_]%')
+        UNION ALL
+        SELECT 'OCRD.CardName', RTRIM(CardCode), CardName,
+               CASE WHEN CardName LIKE N'%' + CHAR(34) + '%' THEN 'CSV' ELSE 'TEST' END
+        FROM   sap_raw.OCRD
+        WHERE  CardType = 'C'
+          AND  (CardName LIKE N'%' + CHAR(34) + '%' OR CardName LIKE 'DESHABILITAT[_][_]%')
+        UNION ALL
+        SELECT 'OCRD.E_Mail', RTRIM(CardCode), E_Mail,
+               CASE WHEN E_Mail LIKE N'%' + CHAR(34) + '%' THEN 'CSV' ELSE 'TEST' END
+        FROM   sap_raw.OCRD
+        WHERE  CardType = 'C'
+          AND  (E_Mail LIKE N'%' + CHAR(34) + '%' OR E_Mail LIKE 'DESHABILITAT[_][_]%')
+        UNION ALL
+        SELECT 'OITM.ItemName', RTRIM(ItemCode), ItemName,
+               CASE WHEN ItemName LIKE N'%' + CHAR(34) + '%' THEN 'CSV' ELSE 'TEST' END
+        FROM   sap_raw.OITM
+        WHERE  ItemName LIKE N'%' + CHAR(34) + '%' OR ItemName LIKE 'DESHABILITAT[_][_]%';
+
+        SELECT @cnt = COUNT(*) FROM #artifact;
+        IF @cnt > 0
+        BEGIN
+            DECLARE @art_detail nvarchar(max) =
+                'Valors mestres de SAP amb artefactes de la migracio: ' + CAST(@cnt AS varchar(20))
+                + ' (escapament CSV=' + CAST((SELECT COUNT(*) FROM #artifact WHERE kind = 'CSV') AS varchar(20))
+                + ', prefix de test=' + CAST((SELECT COUNT(*) FROM #artifact WHERE kind = 'TEST') AS varchar(20))
+                + '). No trenca res, pero el prefix NNN- del nom d adreça es el numero que va a '
+                + 'Analitza i una cometa el tapa. S arregla a SAP, no aqui. ';
+            SELECT TOP 10 @art_detail = @art_detail
+                   + a.entity + ' ' + a.[key] + '=' + ISNULL(a.val, '') + ' | '
+            FROM   #artifact AS a
+            ORDER BY a.kind, a.entity, a.[key];
+
+            INSERT [audit].data_quality_warnings (run_id, check_name, severity, details)
+            VALUES (@rid, 'master_name_artifacts', 'WARN', @art_detail);
+        END
+        DROP TABLE #artifact;
+
         IF @RunId IS NOT NULL
             INSERT [audit].etl_step_log (run_id, step_name, started_at, finished_at, duration_ms, [status], error_message)
             VALUES (@RunId, 'sp_data_quality_checks', @started, SYSUTCDATETIME(),

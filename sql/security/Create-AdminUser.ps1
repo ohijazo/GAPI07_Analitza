@@ -20,7 +20,12 @@
 #                                         falla a mitges i algu tornaria a
 #                                         agafar `sa`, que es justament el cami
 #                                         de tornada que volem tancar
-#   DB_FARINERA_TEST  DENY CONNECT        cap acces a SAP (Regla 01)
+#   DB_FARIN_TEST     DENY CONNECT        cap acces a SAP (Regla 01)
+#   DB_FARINERA       DENY CONNECT        idem
+#   DB_FARINERA_TEST  DENY CONNECT        idem -- la companyia de test antiga,
+#                                         restaurada sobre DB_FARIN_TEST el
+#                                         22/09/2026. Ja esta OFFLINE; es queda
+#                                         a la llista fins que la treguin
 #   SBO-COMMON        DENY CONNECT        idem
 #
 # No es sysadmin, i per tant no pot arribar a les BD de SAP encara que algu hi
@@ -50,6 +55,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Les BD de SAP d'aquest servidor. Serveixen per a dues coses que han d'anar
+# sempre juntes: denegar-hi CONNECT i comprovar despres que la denegacio val.
+# DB_FARINERA_TEST ja estava OFFLINE el 22/09/2026: el try/catch de sota ho
+# tolera i avisa en groc. Quan la treguin del servidor, treure-la d'aqui.
+$SapDatabases = @('DB_FARIN_TEST', 'DB_FARINERA', 'DB_FARINERA_TEST', 'SBO-COMMON')
 
 function Read-Plain([string]$prompt) {
     $sec = Read-Host $prompt -AsSecureString
@@ -130,7 +141,7 @@ ALTER ROLE SQLAgentOperatorRole ADD MEMBER [$Login];
 "@
     Write-Host "  msdb: SQLAgentOperatorRole" -ForegroundColor Green
 
-    foreach ($db in @('DB_FARINERA_TEST', 'SBO-COMMON')) {
+    foreach ($db in $SapDatabases) {
         try {
             Exec $db @"
 IF USER_ID('$Login') IS NULL CREATE USER [$Login] FOR LOGIN [$Login];
@@ -169,19 +180,48 @@ SELECT CAST(@dbo AS int) AS a, CAST(@base AS int) AS b, CAST(@raw AS int) AS c;
     }
     $rd.Close(); $t.Close()
 
-    # I el que NO ha de poder fer: entrar a la BD de SAP.
-    try {
-        $sap = New-Object System.Data.SqlClient.SqlConnection `
-            ($connStr -replace 'Database=IntercanviSAP', 'Database=DB_FARINERA_TEST')
-        $sap.Open(); $sap.Close()
-        Write-Host "  Entra a DB_FARINERA_TEST : SI -- malament, revisa el DENY CONNECT" -ForegroundColor Red
-    } catch {
-        Write-Host "  Entra a DB_FARINERA_TEST : no (correcte)"
+    # I el que NO ha de poder fer: entrar a cap BD de SAP.
+    #
+    # Abans aixo construia la cadena amb "$connStr -replace ...", i $connStr no
+    # s'assigna enlloc d'aquest script: la connexio es feia amb una cadena
+    # buida, petava sempre, requeia al catch i escrivia "no (correcte)" tant si
+    # el DENY hi era com si no. Un verd fals sobre una comprovacio de la Regla
+    # 01, que es el pitjor lloc on tenir-ne un. Ara va per New-SqlConn, el
+    # mateix cami que la resta de l'script, amb la credencial de debo.
+    foreach ($db in $SapDatabases) {
+        try {
+            $sap = New-SqlConn $Server $db $Login $newPwd
+            $sap.Open(); $sap.Close()
+            Write-Host "  Entra a $db : SI -- malament, revisa el DENY CONNECT" -ForegroundColor Red
+        } catch {
+            # 4060 (no pot obrir la BD) i 18456 (login rebutjat) son el resultat
+            # bo. Una BD que no existeix dona 4060 igualment, aixi que aixo no
+            # distingeix "denegat" de "ja no hi es" -- i no cal: cap dels dos
+            # casos es un forat.
+            Write-Host "  Entra a $db : no (correcte)"
+        }
     }
 
     # Els user-secrets. Nomes afecta el teu entorn de desenvolupament; a
-    # AE01SAPRDP la configuracio va a appsettings.Production.json i alla el
+    # AE02SAPRDP la configuracio va a appsettings.Production.json i alla el
     # Worker ha d'anar amb gapi07_worker, no amb aixo.
+    #
+    # La cadena es munta aqui. Abans venia de $connStr, que no s'assignava
+    # enlloc de l'script: el que s'escrivia als user-secrets era un valor buit,
+    # i el Worker es quedava sense cadena de connexio. Mateix bug que hi havia
+    # a la comprovacio del DENY, i aquest a mes destruia configuracio bona.
+    #
+    # Amb SqlConnectionStringBuilder, i no concatenant: si la contrasenya porta
+    # ';', '=' o cometes, el builder l'escapa i la concatenacio la trencaria.
+    $csb = New-Object System.Data.SqlClient.SqlConnectionStringBuilder
+    $csb['Server']                 = $Server
+    $csb['Database']               = 'IntercanviSAP'
+    $csb['User Id']                = $Login
+    $csb['Password']               = $newPwd
+    $csb['Encrypt']                = $false
+    $csb['TrustServerCertificate'] = $true
+    $connStr = $csb.ConnectionString
+
     Write-Host ""
     $ans = Read-Host "Poso aquesta cadena als user-secrets del Worker? (s/N)"
     if ($ans -eq 's' -or $ans -eq 'S') {
