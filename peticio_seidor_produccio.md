@@ -30,8 +30,10 @@ Dues preguntes concretes:
   fer-ho, perquè la correspondència la teniu vosaltres a l'origen. Si no entra per aquí, cal decidir
   qui l'omple i com, i això és feina de dies.
 
-**2. Autoritzacions de lectura per a `proceso`.** Avui he provat la connexió contra la productiva i el
-`Login` entra correctament, però la primera lectura respon:
+**2. Autoritzacions de lectura per a `proceso`, a punt abans del 27 d'octubre.** No les necessito avui
+—la validació del procés es fa tota contra la companyia de test, i allà ja funciona—, però el dia del
+tall l'únic canvi que faig és apuntar el procés a la companyia productiva, i això ha d'estar resolt
+abans. Ho he comprovat avui: el `Login` entra correctament, i la primera lectura respon:
 
 ```
 403  {"code":-3000,"message":"The logged-on user does not have permission to use this object."}
@@ -45,9 +47,10 @@ d'escriptura**: el procés només llegeix.
 ⚠️ Si el tipus de llicència de `proceso` no permet aquestes autoritzacions, digue-m'ho i ho replantegem
 — és millor saber-ho ara que l'1 de novembre.
 
-Això no és només per al dia del tall: **sense lectura no puc mesurar res** de la productiva, i hi ha
-comprovacions que, si surten malament, són setmanes de feina (la cobertura dels codis de KAIS, el volum
-de documents que ha de baixar la primera càrrega).
+La setmana del **27 al 31 d'octubre** tinc previst fer una passada de lectura contra la productiva per
+mesurar dues coses que a test no es poden veure: la cobertura real dels codis de KAIS i el volum de
+documents que ha de baixar la primera càrrega. Si aquella setmana encara no hi ha lectura, el dia 2
+anem a cegues.
 
 **3. Dues confirmacions curtes.**
 
@@ -81,3 +84,12 @@ altra. Fer-ho servir com a argument ara convidaria a donar el problema per dimen
 
 **Si contesta només el 403** —que és el fàcil i el que sembla urgent— **cal repreguntar el punt 1 sol**.
 És el mateix patró del `/100` amb l'Adrià: dins d'una llista, la pregunta cara es queda sense resposta.
+
+**Per què el punt 2 demana «abans del 27 d'octubre» i no «ara».** La validació del projecte es fa tota
+a test i allà està feta: a producció no hi ha res a *provar*. Les autoritzacions es demanen avui perquè
+tenen cua i perquè el cutover és canviar una clau que avui no funciona, no perquè calgui connectar-hi
+aquesta setmana. La mesura de la cobertura i del volum segueix on era, a la setmana del 27-31.
+
+**El punt 1 sí que és d'ara**, i la diferència és que no és una prova ni una mesura: és una **dada que
+ha d'entrar per la migració de mestres a producció**, que passa abans del tall. Si s'ha de corregir
+després, són 4.700 clients.

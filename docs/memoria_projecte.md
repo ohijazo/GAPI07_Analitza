@@ -1382,6 +1382,14 @@ diumenge 05/10, que a test és el de sempre).
 
 **Trobat quatre setmanes abans del tall, i si s'hagués trobat el dia 2 el cutover hauria fallat.**
 
+> ⚠️ **Però que quedi clar què es va a buscar a producció, perquè és fàcil de confondre i ja s'ha
+> hagut d'aclarir:** **a producció no hi ha res a *provar*.** Tota la validació del projecte es fa
+> contra la companyia de test i està feta. El que només existeix a l'altra banda són dues coses d'una
+> altra naturalesa: una **precondició de dades que no és nostra** (que `U_FCCodiKais` hi sigui i estigui
+> poblat — veure la secció següent) i un **permís**, que per definició no es pot comprovar a test.
+> La **mesura** de la cobertura i del volum segueix programada per a la setmana del 27-31 d'octubre; les
+> autoritzacions es demanen ara perquè tenen cua, no perquè calgui connectar-hi aquesta setmana.
+
 Es va llançar la sonda contra la companyia productiva —lectura pura, no escriu enlloc— amb una sola
 variable d'entorn i sense tocar cap fitxer:
 
