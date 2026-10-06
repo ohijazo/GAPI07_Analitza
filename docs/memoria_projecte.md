@@ -1371,13 +1371,34 @@ s, i els cinc WARN coneguts i benignes (`master_name_artifacts` 2.338, `ship_no_
 baseline esperat, `ship_address_changed` 1, `new_code_ambiguous` 1 i `volume_anomaly` per 0 línies el
 diumenge 05/10, que a test és el de sempre).
 
-⚠️ **Però de quin usuari va fer servir la tasca no en queda rastre enlloc.** El Worker escriu el log a
-la consola i la tasca programada el llença: a `C:\Apps\SapB1AnalitzaSync` no hi ha cap fitxer de log. El
-que ho demostra és indirecte —la configuració diu `proceso`, no hi ha cap altre usuari al fitxer, i la
-dada s'ha escrit—, i n'hi ha prou avui, però el dia que el cicle falli de nit no hi haurà res a mirar
-més que `audit.etl_runs` i `sync_state`. Redirigir la sortida demanaria tocar la definició de la tasca,
-que és d'un administrador; **l'alternativa nostra és que el Worker escrigui el seu propi fitxer de log
-al costat de l'executable**, que és codi i no depèn de ningú.
+### ✅ El Worker escriu el seu propi log (06/10/2026)
+
+El run 167 va destapar un buit: **de quin usuari havia fet servir la tasca no en quedava rastre
+enlloc.** El Worker escrivia només per consola i la tasca de les 02:45 no redirigeix la sortida, així
+que es perdia. L'única evidència era indirecta —el fitxer de configuració el nomenava— i el dia que el
+cicle fallés de nit no hi hauria hagut res a mirar més que `audit.etl_runs` i `sync_state`.
+
+Redirigir la sortida voldria tocar la definició de la tasca, que és d'un administrador d'una màquina
+que no és nostra. Així que ho fa el Worker: **`logs\worker-AAAAMMDD.log` al costat de l'executable**, un
+fitxer per dia i **30 dies de retenció** (`FileLog` a la configuració). Desplegat i verificat el mateix
+dia:
+
+```
+2026-10-06 06:45:27Z INF ServiceLayerClient Login a Service Layer https://192.168.11.238:50000/b1s/v1/ (CompanyDB=DB_FARIN_TEST, usuari=proceso)
+```
+
+Quatre decisions que no són evidents, i el perquè:
+
+| | |
+|---|---|
+| **No pot fer petar el Worker** | Si la carpeta no fos escrivible pel compte de la tasca, el cicle ha de seguir refrescant el mirall igualment. Tot va dins d'un `try`; si falla, ho diu **una** vegada per consola i es calla. Un log que trenca la feina és pitjor que no tenir-ne |
+| **UTF-8 amb BOM** | Sense BOM, PowerShell 5.1 i el Notepad del servidor llegeixen el fitxer com a ANSI i `reemplaçament` surt `reemplaÃ§ament`. És la mateixa mossegada que la Regla 05 als `.ps1`, i aquest log existeix **per llegir-lo en aquella màquina** |
+| **Segell en UTC** | Perquè es pugui comparar amb `sap_raw.sync_state.updated_at`, que també és UTC, sense convertir res |
+| **La retenció no esborra res que no haguem escrit** | Només fitxers que casen amb `worker-AAAAMMDD.log`, i `RetentionDays <= 0` **no esborra res** en comptes d'esborrar-ho tot: un zero per badada no ha de buidar una carpeta d'una màquina compartida |
+
+La política de noms, format i retenció viu a `SapB1AnalitzaSync.Shared/Logging/FileLogPolicy.cs` perquè
+és lògica pura i té tests (Regla 05): **45 tests, eren 28**. I `sapsistema` té `FullControl` heretat
+sobre `logs\`, comprovat, o sigui que el cicle de les 02:45 hi pot escriure.
 
 ### ✅ `AE01SAPRDP` no s'ha de netejar: desapareix (05/10/2026)
 

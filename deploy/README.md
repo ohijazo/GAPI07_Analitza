@@ -255,6 +255,29 @@ El contingut que en surt, per si algun dia l'has de llegir:
 `AllowInvalidCertificates` a `true` perquè el certificat del Service Layer és autofirmat. Si algun
 dia se'n posa un de vàlid, cal treure-ho.
 
+### On mirar quan una nit falli: el log del Worker
+
+Des del 06/10/2026 el Worker escriu **`C:\Apps\SapB1AnalitzaSync\logs\worker-AAAAMMDD.log`**: un
+fitxer per dia, **30 dies** de retenció, segells en **UTC** i **UTF-8 amb BOM** perquè el
+`Get-Content` de PowerShell 5.1 i el Notepad del servidor no el llegeixin com a ANSI. Es configura a
+la secció `FileLog` (`Enabled`, `Directory`, `RetentionDays`).
+
+Abans d'això la tasca de les 02:45 llençava la sortida i no quedava rastre de res — ni de **quin
+usuari de Service Layer** s'havia fet servir.
+
+```powershell
+# L'ultima execucio, des de l'equip local
+Invoke-Command -ComputerName AE02SAPRDP -ScriptBlock {
+  Get-Content (Get-ChildItem 'C:\Apps\SapB1AnalitzaSync\logs\*.log' |
+               Sort-Object LastWriteTime | Select-Object -Last 1).FullName -Tail 30
+}
+```
+
+⚠️ **Si el fitxer no hi és, no vol dir que el Worker no hagi corregut.** El log **mai** fa petar el
+cicle: si la carpeta no fos escrivible pel compte de la tasca, es queixa una vegada per la consola
+—que ningú no veu— i continua refrescant el mirall. La vigilància bona segueix sent
+`sap_raw.sync_state` i `audit.etl_runs`; el log serveix per saber **per què**, no per saber **si**.
+
 ### Canviar UNA clau sense RDP i sense tocar les contrasenyes
 
 **`AE02SAPRDP` accepta WinRM per a `ohijazo`** (comprovat el 05/10/2026: `Test-WSMan` i

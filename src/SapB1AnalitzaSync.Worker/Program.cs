@@ -1,5 +1,6 @@
 using System.Net;
 using SapB1AnalitzaSync.Shared.Configuration;
+using SapB1AnalitzaSync.Worker.Logging;
 using SapB1AnalitzaSync.Worker.Services;
 
 // Punt d'entrada del Worker. Tres modes, tots d'un sol tret (no hi ha
@@ -18,6 +19,14 @@ builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOpt
 
 var slOptions = builder.Configuration.GetSection(ServiceLayerOptions.SectionName).Get<ServiceLayerOptions>()
                 ?? new ServiceLayerOptions();
+
+// El log també a fitxer: la tasca de les 02:45 no redirigeix la sortida i la
+// consola es perd. Es registra abans de qualsevol LogX perquè el fitxer porti
+// també les guardes d'arrencada, que són les que diuen què s'ha configurat mal.
+var fileLogOptions = builder.Configuration.GetSection(FileLogOptions.SectionName).Get<FileLogOptions>()
+                     ?? new FileLogOptions();
+if (fileLogOptions.Enabled)
+    builder.Logging.AddProvider(new FileLoggerProvider(fileLogOptions, AppContext.BaseDirectory));
 
 builder.Services.AddHttpClient<ServiceLayerClient>(http =>
     {
