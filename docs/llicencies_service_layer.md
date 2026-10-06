@@ -111,10 +111,20 @@ canvi va ser una sola clau als dos llocs del punt 2 de sota.
 Verificat pel camí real: `--once` **a `AE02SAPRDP`**, amb la configuració de producció, surt amb `0`,
 al log hi diu `usuari=proceso` i les **nou entitats** de `sap_raw.sync_state` queden segellades.
 
-⏳ **El que queda per tancar-ho bé és la pregunta 1 de més avall**: a quina hora corren GAPI01 i
-GAPI09, que comparteixen el compte. Mentre no se sàpiga, compartir-lo és «probable», no «assegurat»
-—i la unitat és el temps de **sessió**, no el d'execució—. Nosaltres fem `Logout`, així que la nostra
-meitat del tracte està complerta.
+✅ **I el 06/10/2026 en Carles tanca la pregunta de qui més el fa servir: ningú.**
+
+> El GAPI01 (integració amb financials) **no utilitza Service Layer**.
+> El GAPI09 (Integració amb CyC) **no s'ha desenvolupat encara**.
+
+O sigui que el compte que es deia «nocturno» perquè el compartien dos processos **avui no el comparteix
+ningú**, i GAPI07 el té per ell sol. La pregunta de si les sessions se solapaven queda sense objecte, i
+el «probable» passa a «assegurat» sense haver de mesurar res.
+
+⚠️ **Però es tornarà a obrir, i val la pena deixar-ho escrit ara**: GAPI09 **està per fer**. El dia que
+es desenvolupi, si li donen aquest mateix compte, la pregunta torna —i la resposta ja la sabem: ha de
+fer **`Logout`** en acabar cada cicle i **no pot treballar dins de la finestra de les 02:45**. Si no es
+pot assegurar cap de les dues coses, necessita compte propi. Qui ho desenvolupi no ho sabrà si no ho
+troba escrit.
 
 ⚠️ **I el que NO arregla:** `OHijazo` segueix als altres tres projectes, amb la mateixa contrasenya de
 4 caràcters. El dia que canviï o marxi, s'aturen tots tres.
@@ -157,7 +167,9 @@ configuració a mitges. Fer-ho de dia, i llançar l'`--once` a mà tot seguit.
 
 ## El que s'ha de confirmar
 
-1. **Quan corren GAPI01 i GAPI09**, que segons el partner ja comparteixen `proceso nocturno`.
+1. ~~**Quan corren GAPI01 i GAPI09**, que segons el partner ja comparteixen `proceso nocturno`.~~
+   ✅ **Contestat el 06/10/2026: cap dels dos el fa servir.** GAPI01 no va per Service Layer i GAPI09
+   encara no s'ha desenvolupat. El compte és nostre de fet. ⏳ Es reobre el dia que es faci GAPI09.
 2. **Si `GAP001`, `GAPI03`, `preparacioComandesVenda` i el VBA fan `Logout`.** Si no en fan, retenen
    mitja hora cadascun i el repartiment de dalt no aguanta.
 3. **El consum indirecte d'Analitza CM**, que és una pregunta d'una altra mena i més cara: el

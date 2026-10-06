@@ -1039,10 +1039,17 @@ segellat amb les **nou entitats** a les 13:40 UTC. Codi de sortida **i** dada es
 > clau que calgui. `AE01SAPRDP` **no**: denega WinRM i `schtasks` (comprovat el 05/10/2026), i per això
 > la neteja de la màquina vella segueix pendent.
 
-⏳ **El que queda d'això** és preguntar a en Carles **a quina hora corren GAPI01 i GAPI09**, que
-comparteixen el mateix compte. Compartir no vol dir «no coincidir en l'execució» sinó **que les
-sessions no se solapin**: nosaltres treballem 20 segons a les 02:45 i fem `Logout`, així que alliberem
-de seguida, però d'ells no ho sabem. I queda treure `OHijazo` dels altres tres projectes.
+✅ **I el 06/10/2026 en Carles tanca la pregunta de qui més fa servir el compte: ningú.** GAPI01
+(financials) **no va per Service Layer** i GAPI09 (CyC) **encara no s'ha desenvolupat**. El compte que
+es deia «nocturno» perquè el compartien dos processos **el té GAPI07 per ell sol**, i el «probable»
+passa a «assegurat» sense haver de mesurar res.
+
+⚠️ **Es reobrirà, i per això queda escrit:** el dia que es desenvolupi **GAPI09**, si li donen aquest
+mateix compte, la pregunta torna. La resposta ja la sabem: ha de fer **`Logout`** en acabar cada cicle
+i **no pot treballar dins de la finestra de les 02:45**; si no es pot assegurar cap de les dues coses,
+necessita compte propi. Està a `docs/llicencies_service_layer.md`, que és on ho buscarà qui ho faci.
+
+⏳ **El que queda d'això** és treure `OHijazo` dels altres tres projectes de `P:`.
 
 ### Llicenciament de SAP — obert, i més gran del que sembla
 
