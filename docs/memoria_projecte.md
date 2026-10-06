@@ -1426,6 +1426,38 @@ així, torna la conversa de §*Llicenciament de SAP* amb el partner.
 s'aturarà a la primera que encara falti. No es dona per bo fins que arribi al final i tregui les
 xifres.
 
+### 🔴 I a la companyia productiva no hi tenim accés (06/10/2026)
+
+Dit el mateix dia, i **invalida una pila de passos d'aquest document i del runbook**: tot el que hi diu
+«ho fa l'Oscar» dins de SAP **només val per a la companyia de test**. A `DB_FARINERA` no hi entra.
+
+Això no s'havia vist abans perquè **tot el que s'ha fet s'ha fet a test**, i la comunicació als
+consultors del 26/08/2026 (*«els creo i els omplo jo»*) només era certa allà.
+
+**El que ho fa greu no és el 403, és això:** els **camps d'usuari de SAP B1 són per companyia**.
+`OCRD.U_FCCodiKais` i `OITB.U_FCCodiKais` es van crear el 26/08 a `DB_FARINERA_TEST` —d'on ve la
+restauració de `DB_FARIN_TEST`— i **de la productiva no se sap ni si existeixen**. Si el dia 2 el camp
+no hi és o arriba buit, `COALESCE(U_FCCodiKais, CardCode)` cau al codi de SAP i **Analitza rep ~4.700
+clients com si fossin nous**, amb la qual cosa perd l'històric de tots. És el risc que §6.6 ja
+anomenava i que fins avui es donava per cobert perquè a test el camp està poblat a 4.689 de 4.691.
+
+El moment natural d'omplir-lo és **la migració de dades mestres a producció**, perquè la
+correspondència la té qui la fa. Si no entra per aquí, omplir 4.700 clients passa a ser **el camí
+crític del projecte**, no una tasca de preparació.
+
+**Sense amo a producció, a 06/10/2026:**
+
+| Feina | On consta |
+|---|---|
+| Autoritzacions de lectura per a `proceso` | §anterior |
+| Que `U_FCCodiKais` existeixi **i estigui poblat** a `OCRD` i `OITB` | §6.4, §6.6, runbook pas 3 |
+| Esborrar `OCRD.U_FCNewCardCode` + reiniciar Service Layer | runbook pas 4 |
+| Netejar els 67 valors mestres amb escapament CSV | §9 |
+| Comprovar `01761 ESPECIFICA TURRIS` | §9 |
+
+Demanat a SEIDOR el 06/10/2026 amb `peticio_seidor_produccio.docx`, posant `U_FCCodiKais` **de primer**
+i el 403 de segon: el 403 bloqueja la mesura, però el que té cua llarga és el camp.
+
 ### ✅ El Worker escriu el seu propi log (06/10/2026)
 
 El run 167 va destapar un buit: **de quin usuari havia fet servir la tasca no en quedava rastre

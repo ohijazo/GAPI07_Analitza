@@ -18,6 +18,7 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 | Depèn de | Què falta |
 |---|---|
+| 🔴 **A la companyia productiva no hi tenim accés** | **Dit el 06/10/2026, i és el que reparteix de nou tota la feina d'aquest runbook**: tot el que aquí diu «ho fa l'Oscar» dins de SAP val per a **test**, no per a `DB_FARINERA`. Els **UDFs i les autoritzacions de B1 són per companyia** i res s'hereta de test. El més car és `U_FCCodiKais`: si a producció no existeix o arriba buit, el `COALESCE` cau al `CardCode` i **Analitza rep ~4.700 clients com a nous**. El moment natural d'omplir-lo és la **migració de mestres a producció**. Demanat a SEIDOR amb `peticio_seidor_produccio.docx` (06/10/2026), i afecta els passos **2b, 3 i 4** de la setmana del 27-31 d'octubre |
 | 🔴 **Autoritzacions de `proceso` a la productiva** | **El bloqueig més dur que hi ha, trobat el 06/10/2026 amb la sonda.** El `Login` a `DB_FARINERA` entra, però `BusinessPartners` respon **`403` / `-3000`**: l'usuari no té autorització sobre l'objecte **en aquella companyia**. Les autoritzacions de B1 són per usuari **i per companyia**, i les de test no en diuen res. Cal donar-li lectura sobre les nou entitats de l'abast (*Administració → Inicialització del sistema → Autoritzacions → Autoritzacions generals*), i **verificar-ho tornant a llançar `--probe`** fins que arribi al final. ⚠️ Si el tipus de llicència de `proceso` no ho permet, torna la conversa amb el partner |
 | ⚠️ **Adrià (Analitza)** — el `product_cost` | **El forat gros que queda, ara que el `/100` està tancat.** Emetem **0 a propòsit** (`Sync:CostField = "none"`) perquè Service Layer no exposa res equivalent a `DLN1.StockPrice`, i el 05/10/2026 està mesurat: **231 de 231 línies a zero**. El seu correu del mateix dia demostra que **segueix consumint la columna** (`product_cost/100` és un dels canvis que farà), així que el dia 2 veuria **marges a zero** sense que res ho delati. Preguntat a `resposta_adria_5` amb tres sortides: acceptar `GrossBuyPrice` sabent què és, acordar una altra definició, o confirmar que ja no el fan servir. **Qualsevol de les tres val; arribar al dia 2 sense resposta, no** |
 | ~~**Adrià (Analitza)** — el `/100`~~ | ✅ **Tancat el 05/10/2026, per escrit i amb el codi al davant.** Enumera els canvis que ja té provats per al dia del tall i els dos primers són `product_price/100 -> product_price` i `product_cost/100 -> product_cost`. **Nosaltres no hem de fer res**: els preus van en euros tal com surten. Del mateix correu: carrega només `date >= '2026-11-02'`, i **del `discount` no diu res**, o sigui que manté el seu `1 - discount` |
@@ -151,7 +152,14 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    facturat 62.675 € en dotze mesos. Si a `DB_FARINERA_PROD` també li falta el nom, el problema no és
    la família: és l'article. I si està bé, posar-li la família que hagi dit comercial.
 
-3. **Poblar els `U_FCCodiKais` que faltin a `OCRD`.** Aquest és el punt amb data: un client existent
+3. 🔴 **Poblar els `U_FCCodiKais` que faltin a `OCRD`** — i abans de res, **comprovar que el camp hi
+   és**. Els UDFs són **per companyia**: es van crear el 26/08/2026 a la de test i de `DB_FARINERA` no
+   se'n sap res. **Això ja no ho pot fer l'Oscar, que no hi té accés** (06/10/2026): o entra per la
+   migració de dades mestres a producció, que és el moment natural perquè la correspondència la té qui
+   la fa, o cal decidir qui l'omple. Si s'ha de fer a mà són 4.700 clients i passa a ser el camí crític
+   del projecte. Demanat a SEIDOR amb `peticio_seidor_produccio.docx`.
+
+   Aquest és el punt amb data: un client existent
    que es quedi amb el camp buit cau al `CardCode` de SAP i **Analitza el veu com un client nou**, en
    silenci i el dia que menys es mira. La sonda llista els que queden buits; no es poden filtrar pels
    actius, perquè `sp_load_clients` emet tots els `cCustomer` i un client de baixa també hi arriba.
