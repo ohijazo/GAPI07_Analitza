@@ -1378,6 +1378,54 @@ s, i els cinc WARN coneguts i benignes (`master_name_artifacts` 2.338, `ship_no_
 baseline esperat, `ship_address_changed` 1, `new_code_ambiguous` 1 i `volume_anomaly` per 0 línies el
 diumenge 05/10, que a test és el de sempre).
 
+### 🔴 `proceso` NO té permisos a la companyia productiva (06/10/2026)
+
+**Trobat quatre setmanes abans del tall, i si s'hagués trobat el dia 2 el cutover hauria fallat.**
+
+Es va llançar la sonda contra la companyia productiva —lectura pura, no escriu enlloc— amb una sola
+variable d'entorn i sense tocar cap fitxer:
+
+```powershell
+$env:DOTNET_ENVIRONMENT='Development'
+$env:ServiceLayer__CompanyDb='DB_FARINERA'
+dotnet run -- --probe
+```
+
+Dues coses, i la segona atura el projecte fins que es resolgui:
+
+1. ✅ **El `Login` entra.** `DB_FARINERA` existeix, és ONLINE i **`proceso` hi és un usuari vàlid**.
+   Això és la millor pista que tenim del nom de la companyia productiva, que el runbook donava per fet
+   com a `DB_FARINERA_PROD` —un nom que **no existeix**.
+2. 🔴 **La primera lectura respon `403`:**
+
+   ```json
+   {"error":{"code":-3000,"message":{"value":"The logged-on user does not have permission to use this object."}}}
+   ```
+
+   `proceso` **no té autorització sobre `BusinessPartners` a la companyia productiva**. La sonda avorta
+   a la primera entitat, així que **de les altres vuit no se'n sap res encara**.
+
+**Per què no s'havia vist abans:** les autoritzacions de SAP B1 són **per usuari i per companyia**.
+`proceso` llegeix `DB_FARIN_TEST` sense problemes des del 05/10, i d'això no se'n deriva absolutament
+res sobre la productiva. És una variant nova del patró de sempre d'aquest projecte —*funciona a test,
+per tant funcionarà a producció*— i aquesta tenia data: el 2 de novembre, amb el `Login` entrant i les
+lectures morint, el missatge hauria apuntat a tot arreu menys al lloc correcte.
+
+**Què cal demanar**, i és una feina de dins de SAP (*Administració → Inicialització del sistema →
+Autoritzacions → Autoritzacions generals*), amb permís **només de lectura** per a `proceso` a la
+companyia productiva sobre les nou entitats de l'abast:
+
+`BusinessPartners` (amb `BPAddresses`) · `Items` · `ItemGroups` · `SalesPersons` ·
+`WizardPaymentMethods` · `DeliveryNotes` · `Returns` · `CreditNotes` · `Invoices`
+
+⚠️ **I el que pot convertir això en una compra de llicència:** si `proceso` és d'un tipus de llicència
+limitat, pot ser que no se li puguin donar aquestes autoritzacions per molt que es vulgui. Si surt
+així, torna la conversa de §*Llicenciament de SAP* amb el partner.
+
+**La verificació és tornar a llançar exactament la mateixa sonda**: anirà entitat per entitat i
+s'aturarà a la primera que encara falti. No es dona per bo fins que arribi al final i tregui les
+xifres.
+
 ### ✅ El Worker escriu el seu propi log (06/10/2026)
 
 El run 167 va destapar un buit: **de quin usuari havia fet servir la tasca no en quedava rastre

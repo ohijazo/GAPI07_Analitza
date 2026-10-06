@@ -18,6 +18,7 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 | Depèn de | Què falta |
 |---|---|
+| 🔴 **Autoritzacions de `proceso` a la productiva** | **El bloqueig més dur que hi ha, trobat el 06/10/2026 amb la sonda.** El `Login` a `DB_FARINERA` entra, però `BusinessPartners` respon **`403` / `-3000`**: l'usuari no té autorització sobre l'objecte **en aquella companyia**. Les autoritzacions de B1 són per usuari **i per companyia**, i les de test no en diuen res. Cal donar-li lectura sobre les nou entitats de l'abast (*Administració → Inicialització del sistema → Autoritzacions → Autoritzacions generals*), i **verificar-ho tornant a llançar `--probe`** fins que arribi al final. ⚠️ Si el tipus de llicència de `proceso` no ho permet, torna la conversa amb el partner |
 | ⚠️ **Adrià (Analitza)** — el `product_cost` | **El forat gros que queda, ara que el `/100` està tancat.** Emetem **0 a propòsit** (`Sync:CostField = "none"`) perquè Service Layer no exposa res equivalent a `DLN1.StockPrice`, i el 05/10/2026 està mesurat: **231 de 231 línies a zero**. El seu correu del mateix dia demostra que **segueix consumint la columna** (`product_cost/100` és un dels canvis que farà), així que el dia 2 veuria **marges a zero** sense que res ho delati. Preguntat a `resposta_adria_5` amb tres sortides: acceptar `GrossBuyPrice` sabent què és, acordar una altra definició, o confirmar que ja no el fan servir. **Qualsevol de les tres val; arribar al dia 2 sense resposta, no** |
 | ~~**Adrià (Analitza)** — el `/100`~~ | ✅ **Tancat el 05/10/2026, per escrit i amb el codi al davant.** Enumera els canvis que ja té provats per al dia del tall i els dos primers són `product_price/100 -> product_price` i `product_cost/100 -> product_cost`. **Nosaltres no hem de fer res**: els preus van en euros tal com surten. Del mateix correu: carrega només `date >= '2026-11-02'`, i **del `discount` no diu res**, o sigui que manté el seu `1 - discount` |
 | ~~**Nosaltres — handoff**~~ | ✅ **Tancat el 16/09/2026**: contrasenya d'`analitza_ro` passada per un canal a part. Analitza té ruta, credencial i dades |
@@ -237,12 +238,21 @@ màquina, perquè `AE02SAPRDP` allotja webservices de tercers que les llegirien:
 ServiceLayer:CompanyDb  ->  DB_FARINERA_PROD
 ```
 
-⚠️ **`DB_FARINERA_PROD` és un nom que aquest runbook dona per fet, i no està confirmat.** El
-22/09/2026, a `AE01SAPSQL` hi havia `DB_FARIN_TEST` (test), `SBO-COMMON`, `DB_FARINERA_TEST`
-(OFFLINE) i **`DB_FARINERA`** — cap `DB_FARINERA_PROD`. Si la companyia productiva és `DB_FARINERA`,
-posar-hi el nom d'aquest quadre fa que el Worker peti amb `Invalid login credential`, un missatge
-que apunta a la contrasenya i no al nom. **Confirmar-ho amb els consultors abans del tall**, i
-comprovar-ho amb `--probe` des d'`AE02SAPRDP`, que hi entra i no fa cap escriptura.
+⚠️ **`DB_FARINERA_PROD` és un nom que aquest runbook dona per fet, i no existeix.** El 22/09/2026, a
+`AE01SAPSQL` hi havia `DB_FARIN_TEST` (test), `SBO-COMMON`, `DB_FARINERA_TEST` (OFFLINE) i
+**`DB_FARINERA`** — cap `DB_FARINERA_PROD`. Posar-hi el nom d'aquest quadre faria petar el Worker amb
+`Invalid login credential`, un missatge que apunta a la contrasenya i no al nom.
+
+✅ **El 06/10/2026 la sonda va fer `Login` a `DB_FARINERA` correctament amb `proceso`**, o sigui que la
+companyia existeix i l'usuari hi és vàlid. Segueix pendent que un consultor confirmi que és **la**
+productiva, però el nom a posar-hi és aquest i no l'altre.
+
+🔴 **I el mateix dia es va trobar el que bloqueja de debò: `proceso` NO té autoritzacions de lectura a
+la companyia productiva** — `BusinessPartners` respon `403` / `-3000`, *The logged-on user does not have
+permission to use this object*. Les autoritzacions de SAP B1 són **per usuari i per companyia**, i les
+de test no diuen res de les de producció. **Això s'ha de resoldre abans del dia 2, i es verifica
+tornant a llançar la sonda** (veure `docs/memoria_projecte.md`, §*`proceso` NO té permisos a la
+companyia productiva*).
 
 **No** és un `UPDATE` a `cfg.settings`. `SBO_DB` es va esborrar de la base de dades el 26/08/2026
 precisament perquè ningú el canviés pensant que era l'interruptor.
