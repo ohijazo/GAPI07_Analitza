@@ -1361,9 +1361,23 @@ raó bona, i «activar-la» no era un pas de cap llista. Quan un pas del despleg
 I la segona: **el `Acceso denegado` del 25/09 no volia dir «no ho puc saber mai»**. Val la pena
 reintentar una comprovació de només lectura abans de convertir-la en una pregunta a algú altre.
 
-**I el règim estable, que és el que faltava per poder dir que corre sol:** del **30/09 al 05/10/2026**,
-sis nits seguides a la 01:00 UTC —runs **161, 162, 163, 164, 165 i 166**— totes `SUCCESS` en 11-12
-segons, amb el mirall segellat a les 00:45 i cap correu d'alerta.
+**I el règim estable, que és el que faltava per poder dir que corre sol:** del **30/09 al 06/10/2026**,
+set nits seguides a la 01:00 UTC —runs **161 a 167**— totes `SUCCESS` en 11-12 segons, amb el mirall
+segellat a les 00:45 i cap correu d'alerta.
+
+El **run 167 és el primer cicle nocturn complet amb l'usuari `proceso`**: tasca a les 02:45 amb
+`LastTaskResult = 0` i `Estado: Listo`, mirall amb les nou entitats a les 00:45 UTC, ETL `SUCCESS` en 11
+s, i els cinc WARN coneguts i benignes (`master_name_artifacts` 2.338, `ship_no_prefix_mismatch` 4 = el
+baseline esperat, `ship_address_changed` 1, `new_code_ambiguous` 1 i `volume_anomaly` per 0 línies el
+diumenge 05/10, que a test és el de sempre).
+
+⚠️ **Però de quin usuari va fer servir la tasca no en queda rastre enlloc.** El Worker escriu el log a
+la consola i la tasca programada el llença: a `C:\Apps\SapB1AnalitzaSync` no hi ha cap fitxer de log. El
+que ho demostra és indirecte —la configuració diu `proceso`, no hi ha cap altre usuari al fitxer, i la
+dada s'ha escrit—, i n'hi ha prou avui, però el dia que el cicle falli de nit no hi haurà res a mirar
+més que `audit.etl_runs` i `sync_state`. Redirigir la sortida demanaria tocar la definició de la tasca,
+que és d'un administrador; **l'alternativa nostra és que el Worker escrigui el seu propi fitxer de log
+al costat de l'executable**, que és codi i no depèn de ningú.
 
 ### ✅ `AE01SAPRDP` no s'ha de netejar: desapareix (05/10/2026)
 
