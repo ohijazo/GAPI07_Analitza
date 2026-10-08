@@ -10,6 +10,7 @@ using SapB1AnalitzaSync.Worker.Services;
 //   --probe      sonda de la Fase 0; llegeix SAP i compara amb baseline. NO escriu.
 //   --once       refresca sap_raw i surt.  <- el que crida el job
 //   --backfill   com --once, però des de la data indicada amb --from.
+//   --metadata   llista les propietats d'un EntityType del $metadata. NO escriu.
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -55,6 +56,7 @@ builder.Services.AddSingleton<MirrorRepository>();
 builder.Services.AddSingleton<SyncStateStore>();
 builder.Services.AddSingleton<MirrorSyncService>();
 builder.Services.AddSingleton<ProbeService>();
+builder.Services.AddSingleton<MetadataProbeService>();
 
 using var host = builder.Build();
 
@@ -94,6 +96,30 @@ try
     {
         case "--probe":
             return await host.Services.GetRequiredService<ProbeService>().RunAsync(cts.Token);
+
+        // --raw <url>   GET cru contra Service Layer. NOMÉS llegeix; existeix
+        // perquè el $metadata de v1 no declara el tipus de les línies de
+        // document i l'única manera de saber què exposa SL és demanar-ho.
+        case "--raw":
+        {
+            var url = args.SkipWhile(a => a != "--raw").Skip(1)
+                          .FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
+            if (url is null) { log.LogError("--raw necessita una url, p. ex. --raw \"DeliveryNotes?$top=1\""); return 3; }
+
+            var body = await host.Services.GetRequiredService<ServiceLayerClient>().GetRawAsync(url, cts.Token);
+            Console.WriteLine(body);
+            return 0;
+        }
+
+        // --metadata <EntityType> [filtre]   p. ex.  --metadata DocumentLine Price
+        case "--metadata":
+        {
+            var rest = args.SkipWhile(a => a != "--metadata").Skip(1)
+                           .Where(a => !a.StartsWith("--", StringComparison.Ordinal)).ToArray();
+            var entity = rest.ElementAtOrDefault(0) ?? "DocumentLine";
+            var match = rest.ElementAtOrDefault(1);
+            return await host.Services.GetRequiredService<MetadataProbeService>().RunAsync(entity, match, cts.Token);
+        }
 
         case "--backfill":
         {

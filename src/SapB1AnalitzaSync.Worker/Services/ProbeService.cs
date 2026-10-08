@@ -183,6 +183,7 @@ internal sealed class ProbeService
         int compared = 0;
         int priceUnit = 0, pricePrice = 0, priceDiffer = 0;
         int costStockInm = 0, costGrossBuy = 0, costZero = 0;
+        int costLastBuy = 0, costGpBase = 0;
         var costMisses = new List<string>();
 
         foreach (var doc in docs)
@@ -210,10 +211,13 @@ internal sealed class ProbeService
                 if (!NearBoth(line.Price, line.UnitPrice)) priceDiffer++;
 
                 if (Near(line.StockInmPrice, reference.ProductCost)) costStockInm++;
+                if (Near(line.LastBuyInmPrice, reference.ProductCost)) costLastBuy++;
+                if (Near(line.GrossProfitTotalBasePrice, reference.ProductCost)) costGpBase++;
                 if (Near(line.GrossBuyPrice, reference.ProductCost)) costGrossBuy++;
                 else if (costMisses.Count < 10)
                     costMisses.Add($"id={id} cost_ref={reference.ProductCost:F4} GrossBuyPrice={line.GrossBuyPrice:F4} " +
-                                   $"StockInmPrice={line.StockInmPrice:F4} item={line.ItemCode}");
+                                   $"StockInmPrice={line.StockInmPrice:F4} LastBuyInmPrice={line.LastBuyInmPrice:F4} " +
+                                   $"GrossProfitTotalBasePrice={line.GrossProfitTotalBasePrice:F4} item={line.ItemCode}");
                 if (reference.ProductCost == 0m) costZero++;
             }
         }
@@ -231,6 +235,8 @@ internal sealed class ProbeService
         report.AppendLine($"   product_price == Price          : {Pct(pricePrice, compared)}");
         report.AppendLine($"   product_cost  == StockInmPrice  : {Pct(costStockInm, compared)}");
         report.AppendLine($"   product_cost  == GrossBuyPrice  : {Pct(costGrossBuy, compared)}");
+        report.AppendLine($"   product_cost  == LastBuyInmPrice: {Pct(costLastBuy, compared)}");
+        report.AppendLine($"   product_cost  == GrossProfitTotalBasePrice: {Pct(costGpBase, compared)}");
         report.AppendLine($"   product_cost  == 0 a la referència: {Pct(costZero, compared)}");
 
         report.AppendLine($"   linies on UnitPrice != Price     : {Pct(priceDiffer, compared)}");
@@ -265,6 +271,8 @@ internal sealed class ProbeService
 
         string costVerdict;
         if (costStockInm * 100 / compared >= 95) costVerdict = "Sync:CostField = \"StockInmPrice\"";
+        else if (costLastBuy * 100 / compared >= 95) costVerdict = "Sync:CostField = \"LastBuyInmPrice\"";
+        else if (costGpBase * 100 / compared >= 95) costVerdict = "Sync:CostField = \"GrossProfitTotalBasePrice\"";
         else if (costGrossBuy * 100 / compared >= 95) costVerdict = "Sync:CostField = \"GrossBuyPrice\"";
         else if (costZero * 100 / compared >= 95) costVerdict = "Sync:CostField = \"none\" (la referència ja té el cost a 0)";
         else if (costGrossBuy * 100 / compared >= 80)

@@ -161,6 +161,12 @@ public sealed class DocumentLineRow
     /// <summary>L'altre candidat a cost de línia.</summary>
     public double? GrossBuyPrice { get; set; }
 
+    // Els dos candidats que el 25/08/2026 no es van provar perquè ningú havia
+    // llegit la llista: SL no exposa `StockPrice`, però sí aquests dos. Sortits
+    // de demanar un albarà de debò amb `--raw` el 08/10/2026.
+    public double? LastBuyInmPrice { get; set; }
+    public double? GrossProfitTotalBasePrice { get; set; }
+
     public double? DiscountPercent { get; set; }
     public string? LineType { get; set; }
 }

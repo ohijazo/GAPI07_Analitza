@@ -105,6 +105,17 @@ internal sealed class ServiceLayerClient : IAsyncDisposable
         return await _http.GetAsync(url, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Cos cru d'un GET. Existeix per al mode <c>--metadata</c>: el
+    /// <c>$metadata</c> és XML i no cap a cap DTO.
+    /// </summary>
+    public async Task<string> GetRawAsync(string url, CancellationToken ct)
+    {
+        using var resp = await SendAsync(url, ct).ConfigureAwait(false);
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+    }
+
     private async Task<ODataPage<T>> GetPageAsync<T>(string url, CancellationToken ct)
     {
         using var resp = await SendAsync(url, ct).ConfigureAwait(false);

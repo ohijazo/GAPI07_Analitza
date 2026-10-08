@@ -401,6 +401,41 @@ han mogut el cost des de l'albarà.
 Són **conceptes diferents**, no el mateix camp amb un altre nom. Service Layer no exposa cap
 propietat equivalent a `StockPrice`.
 
+#### ✅ I el 08/10/2026 això deixa de ser una impressió: s'ha llegit la llista sencera
+
+La conclusió de dalt sortia d'haver provat **dos** candidats que algú va triar, no d'haver mirat què
+dona SL. Es va mirar, i va caldre arribar-hi per dos camins perquè **el `$metadata` de `/b1s/v1` no
+declara el tipus de les línies**: `Document` hi té `DocumentLines Collection(SAPB1.DocumentLine)`, però
+`DocumentLine` **no és enlloc** del document, ni com a `EntityType` ni com a `ComplexType`. La manera
+d'esbrinar-ho és **demanar un albarà de debò** (mode `--raw`, afegit aquell dia).
+
+Els camps de preu/cost que SL dona a una línia de document són, sencers:
+
+`GrossBuyPrice` · `GrossPrice` · `GrossProfitTotalBasePrice` · `LastBuyInmPrice` · `Price` ·
+`PriceAfterVAT` · `StockInmPrice` · `UnitPrice` (més `CostingCode*`, que són dimensions d'anàlisi, i
+`StockDistributesum*`, que són repartiments de despeses)
+
+**`StockPrice` no hi és.** I els dos candidats que mai s'havien provat, mesurats amb `--probe`:
+
+| Candidat | Coincidència amb `baseline.product_cost` |
+|---|---|
+| `StockInmPrice` | 0/15 |
+| **`LastBuyInmPrice`** | **0/15** — sempre val 0 |
+| **`GrossProfitTotalBasePrice`** | **2/15** — i no és un preu unitari: a `id=100004402` val `20,00` amb cost `5,00` i `GrossBuyPrice` `10,00`, o sigui **`quantitat × GrossBuyPrice`**, un total de línia |
+| `GrossBuyPrice` | 13/15 (86,7 %) |
+
+(15 línies i no 52 perquè la sonda mira tres mesos enrere i els documents de test són de maig a agost.
+Les dues que fallen són les de sempre, `100004400` i `100004402`.)
+
+**Conclusió, ara defensable:** l'opció real és `GrossBuyPrice` o res. I `GrossBuyPrice` **no és el cost
+del moment de l'albarà**: és el preu de compra **actual** de l'article. Si s'adopta, s'ha de **congelar
+a la primera càrrega**, perquè la reconstrucció completa setmanal el tornaria a escriure amb el preu
+d'avui i els marges històrics anirien derivant en silenci.
+
+> La resta de camins possibles —el cost mitjà de l'article a `Items`, o per magatzem a
+> `ItemWarehouseInfoCollection`— tenen **el mateix problema conceptual**: són el valor d'avui, no el del
+> dia de l'albarà. No s'han mesurat perquè no canviarien la decisió.
+
 **`product_cost` SÍ que el consumeix Analitza.** Ho diu el correu de l'Adrià del 12/05/2025
 (`docs/correus_adria_2025-05-12.md`): a la seva llista de camps de LINIES ALBARÀ hi ha
 `product_cost`. Així que l'opció de deixar-lo buit queda descartada sense parlar-ho amb ells, encara
