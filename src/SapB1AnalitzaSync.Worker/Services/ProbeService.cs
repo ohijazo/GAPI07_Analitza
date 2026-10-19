@@ -342,7 +342,7 @@ internal sealed class ProbeService
         // Cens SENCER, no la primera pagina. La cobertura de U_FCCodiKais es una
         // xifra de la qual depen el cutover: si es mesura sobre una mostra, un
         // 100% no vol dir res i els clients sense codi apareixen a Analitza com
-        // a clients nous el dia 2 de novembre. Aixo es la mateixa trampa que la
+        // a clients nous el dia 16 de novembre. Aixo es la mateixa trampa que la
         // Regla 02 (un $top que sembla el total i no ho es), pero pel cantó del
         // qui llegeix l'informe.
         var bps = new List<PartnerRow>();

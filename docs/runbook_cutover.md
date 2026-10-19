@@ -1,13 +1,15 @@
-# Runbook del cutover — 1 i 2 de novembre de 2026
+# Runbook del cutover — 15 i 16 de novembre de 2026
 
 > Document operatiu. Els **perquès** viuen a `docs/memoria_projecte.md` i a `.claude/rules/`;
 > aquí només hi ha què s'ha de fer, en quin ordre, com es comprova i com es desfà.
 >
-> Última actualització: **16/09/2026**
+> Última actualització: **14/10/2026** — la data del tall passa del 2 al **16 de novembre** (comunicat
+> a l'Adrià el 13/10/2026). Totes les dates d'aquest document són ja les noves.
 
 ## El que fa aquest dia diferent
 
-El cutover és un **tall sec**: el 2 de novembre KAIS deixa de rebre dades i SAP comença. No hi
+El cutover és un **tall sec**: el 16 de novembre KAIS deixa de rebre dades i SAP comença (KAIS fins diumenge 15, SAP des de
+dilluns 16). No hi
 haurà cap període amb els dos ERPs vius, així que **una comparació KAIS contra SAP no serà possible
 mai** — ni abans ni després. El que no es validi abans, no es validarà.
 
@@ -18,10 +20,11 @@ la Regla 04 i la nota interna de dos correus. Són aquests, i cap és opcional.
 
 | Depèn de | Què falta |
 |---|---|
-| 🔴 **A la companyia productiva no hi tenim accés** | **Dit el 06/10/2026, i és el que reparteix de nou tota la feina d'aquest runbook**: tot el que aquí diu «ho fa l'Oscar» dins de SAP val per a **test**, no per a `DB_FARINERA`. Els **UDFs i les autoritzacions de B1 són per companyia** i res s'hereta de test. El més car és `U_FCCodiKais`: si a producció no existeix o arriba buit, el `COALESCE` cau al `CardCode` i **Analitza rep ~4.700 clients com a nous**. El moment natural d'omplir-lo és la **migració de mestres a producció**. Demanat a SEIDOR amb `peticio_seidor_produccio.docx` (06/10/2026), i afecta els passos **2b, 3 i 4** de la setmana del 27-31 d'octubre |
+| 🔴 **A la companyia productiva no hi tenim accés** | **Dit el 06/10/2026, i és el que reparteix de nou tota la feina d'aquest runbook**: tot el que aquí diu «ho fa l'Oscar» dins de SAP val per a **test**, no per a `DB_FARINERA`. Els **UDFs i les autoritzacions de B1 són per companyia** i res s'hereta de test. El més car és `U_FCCodiKais`: si a producció no existeix o arriba buit, el `COALESCE` cau al `CardCode` i **Analitza rep ~4.700 clients com a nous**. El moment natural d'omplir-lo és la **migració de mestres a producció**. Demanat a SEIDOR amb `peticio_seidor_produccio.docx` (06/10/2026), i afecta els passos **2b, 3 i 4** de la setmana del 10-14 de novembre. La data límit demanada a SEIDOR
+(27 d'octubre) no s'ha mogut |
 | 🔴 **Autoritzacions de `proceso` a la productiva** | **El bloqueig més dur que hi ha, trobat el 06/10/2026 amb la sonda.** El `Login` a `DB_FARINERA` entra, però `BusinessPartners` respon **`403` / `-3000`**: l'usuari no té autorització sobre l'objecte **en aquella companyia**. Les autoritzacions de B1 són per usuari **i per companyia**, i les de test no en diuen res. Cal donar-li lectura sobre les nou entitats de l'abast (*Administració → Inicialització del sistema → Autoritzacions → Autoritzacions generals*), i **verificar-ho tornant a llançar `--probe`** fins que arribi al final. ⚠️ Si el tipus de llicència de `proceso` no ho permet, torna la conversa amb el partner |
-| ⚠️ **Adrià (Analitza)** — el `product_cost` | **El forat gros que queda, ara que el `/100` està tancat.** Emetem **0 a propòsit** (`Sync:CostField = "none"`) perquè Service Layer no exposa res equivalent a `DLN1.StockPrice`, i el 05/10/2026 està mesurat: **231 de 231 línies a zero**. El seu correu del mateix dia demostra que **segueix consumint la columna** (`product_cost/100` és un dels canvis que farà), així que el dia 2 veuria **marges a zero** sense que res ho delati. Preguntat a `resposta_adria_5` amb tres sortides: acceptar `GrossBuyPrice` sabent què és, acordar una altra definició, o confirmar que ja no el fan servir. **Qualsevol de les tres val; arribar al dia 2 sense resposta, no** |
-| ~~**Adrià (Analitza)** — el `/100`~~ | ✅ **Tancat el 05/10/2026, per escrit i amb el codi al davant.** Enumera els canvis que ja té provats per al dia del tall i els dos primers són `product_price/100 -> product_price` i `product_cost/100 -> product_cost`. **Nosaltres no hem de fer res**: els preus van en euros tal com surten. Del mateix correu: carrega només `date >= '2026-11-02'`, i **del `discount` no diu res**, o sigui que manté el seu `1 - discount` |
+| ⚠️ **Adrià (Analitza)** — el `product_cost` | **El forat gros que queda, ara que el `/100` està tancat.** Emetem **0 a propòsit** (`Sync:CostField = "none"`) perquè Service Layer no exposa res equivalent a `DLN1.StockPrice`, i el 05/10/2026 està mesurat: **231 de 231 línies a zero**. El seu correu del mateix dia demostra que **segueix consumint la columna** (`product_cost/100` és un dels canvis que farà), així que el dia 16 veuria **marges a zero** sense que res ho delati. Preguntat a `resposta_adria_5` amb tres sortides: acceptar `GrossBuyPrice` sabent què és, acordar una altra definició, o confirmar que ja no el fan servir. **Qualsevol de les tres val; arribar al dia 16 sense resposta, no**. ✅ **14/10/2026: `GrossBuyPrice` es guarda a cada línia** (mesurat: el mateix article val diferent a cada albarà), així que no cal congelar-lo; adoptar-lo és només canviar `Sync:CostField`. L'Adrià prefereix **0 a un marge erroni**. ⏳ **Decideix el Lluís: aquest valor o 0**, i se li confirma a l'Adrià abans del 16 (`resposta_adria_7`). |
+| ~~**Adrià (Analitza)** — el `/100`~~ | ✅ **Tancat el 05/10/2026, per escrit i amb el codi al davant.** Enumera els canvis que ja té provats per al dia del tall i els dos primers són `product_price/100 -> product_price` i `product_cost/100 -> product_cost`. **Nosaltres no hem de fer res**: els preus van en euros tal com surten. Del mateix correu: carrega només `date >= '2026-11-02'` —**ara `'2026-11-16'`**, anotat per ell el 14/10—, i **del `discount` no diu res**, o sigui que manté el seu `1 - discount` |
 | ~~**Nosaltres — handoff**~~ | ✅ **Tancat el 16/09/2026**: contrasenya d'`analitza_ro` passada per un canal a part. Analitza té ruta, credencial i dades |
 | **Nosaltres — abans del tall** | Activar `cfg.settings.FAMILY_FROM_COMMERCIAL` a `'1'` (les 12 famílies en comptes dels 110 grups). Codi desplegat i validat el 16/09/2026; el flag és a `'0'`. **Fa desaparèixer 110 identificadors alhora**, així que vol `ID_DROP_MAX` apujat aquell dia i baixat l'endemà. I omplir la família dels **vuit articles** de `docs/memoria_projecte.md` |
 | **Sistemes** | ✅ **El cicle nocturn torna a córrer sol des del 29/09/2026** a `AE02SAPRDP` (192.168.11.136): la tasca hi era des del 16/09 però **estava desactivada**. Sis nits seguides desateses del 30/09 al 05/10 (runs 161-166, tots `SUCCESS` en ~11 s). Carpeta, ACL, sortida cap a `192.168.11.238:50000` i `:1433` i el dret *Log on as a batch job* ja hi eren. ~~`AE01SAPRDP`~~ ✅ **No cal netejar-la: la màquina desapareix i tot passa a `AE02SAPRDP`** (05/10/2026). La tasca vella hi segueix fallant cada nit —l'`appsettings.Production.json` d'allà diu `DB_FARINERA_TEST`, que està OFFLINE—, i això no pot espatllar el mirall: no arriba a escriure res. ⚠️ **L'únic que queda és la credencial**: aquell fitxer porta la contrasenya d'`OHijazo`, que **és la mateixa que la de `proceso`** i per tant encara és viva. Que el disc no acabi en una còpia de la VM, o rotar-la. ~~Accés d'Analitza~~ ✅ **10/09/2026** |
@@ -129,15 +132,15 @@ nous. Ho té acceptat i el correu del 16/09 l'hi anuncia, però la data li serve
 
 ---
 
-## Setmana del 27 al 31 d'octubre — preparació
+## Setmana del 10 al 14 de novembre — preparació
 
-Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
+Res d'això toca producció. És el que fa que el dia 16 no hi hagi sorpreses.
 
 1. **Demanar a l'Adrià l'exportació de clients actualitzada.** La que tenim és del 27/08/2026 i no
    porta les altes fetes des de llavors. Cada client que se'ns escapi li arriba com a client nou.
    Deixar-la a `docs/client_locations.csv`, que és d'on la llegeix `Sync:KaisClientExportPath`.
 
-2. **Repetir la comparació d'ids contra `DB_FARINERA_PROD`, no contra test.** Les xifres que tenim
+2. **Repetir la comparació d'ids contra `DB_FARINERA`, no contra test.** Les xifres que tenim
    —5.621 de 5.684 conservats, 13 clients sense codi— estan mesurades contra la companyia de test
    (`DB_FARINERA_TEST` aleshores, `DB_FARIN_TEST` des del 22/09/2026: és una restauració de la
    mateixa), que és una còpia i va endarrerida. Part dels 13 poden existir a la productiva.
@@ -149,7 +152,7 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
 
 2b. **Comprovar `01761 ESPECIFICA TURRIS` a la productiva.** A `DB_FARIN_TEST` és una closca buida
    —sense nom ni unitat de venda, al grup dels articles de prova— mentre que a KAIS està complet i ha
-   facturat 62.675 € en dotze mesos. Si a `DB_FARINERA_PROD` també li falta el nom, el problema no és
+   facturat 62.675 € en dotze mesos. Si a `DB_FARINERA` també li falta el nom, el problema no és
    la família: és l'article. I si està bé, posar-li la família que hagi dit comercial.
 
 3. 🔴 **Poblar els `U_FCCodiKais` que faltin a `OCRD`** — i abans de res, **comprovar que el camp hi
@@ -186,7 +189,7 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
    queda amb les dades d'ahir, i la fórmula és **contracte**: no es pot canviar sola, s'ha de parlar
    amb l'Adrià. A `DB_FARIN_TEST` no es pot mesurar (màxim **7 línies** per albarà, 47 documents de
    joguina), i la productiva arrenca sense històric documental (blueprint 17.3), així que el risc
-   real són els documents que es facin **a partir del dia 2**.
+   real són els documents que es facin **a partir del dia 16**.
 
    ```sql
    SELECT TOP 5 DocEntry, COUNT(*) AS linies, MAX(LineNum) AS max_linenum
@@ -206,14 +209,14 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
 
 ---
 
-## 1 de novembre — el dia abans
+## 15 de novembre (diumenge) — el dia abans
 
-> **És l'1, no el 2.** Si el dia del tall s'envien codis de SAP en comptes dels de KAIS, Analitza els
+> **És el 15, no el 16.** Si el dia del tall s'envien codis de SAP en comptes dels de KAIS, Analitza els
 > ingereix com a clients nous, i desfer-ho després surt molt més car que fer-ho bé d'entrada.
 
 - [ ] Última passada de `--probe` contra productiva: **cap client sense `U_FCCodiKais`**.
 - [ ] `dotnet build src\SapB1AnalitzaSync.sln -c Release` amb 0 warnings i els tests en verd.
-- [ ] Confirmar per escrit amb l'Adrià **què fa ell el dia 2**: el `/100` i el `1 - discount`.
+- [ ] Confirmar per escrit amb l'Adrià **què fa ell el dia 16**: el `/100` i el `1 - discount`.
       Si no ha contestat, aquí és on s'atura i s'hi insisteix; és l'únic punt que produeix un error
       silenciós.
 - [ ] Deixar apuntada la sortida de l'últim run bo, per tenir contra què comparar l'endemà.
@@ -232,7 +235,7 @@ Res d'això toca producció. És el que fa que el dia 2 no hi hagi sorpreses.
 
 ---
 
-## 2 de novembre — el tall
+## 16 de novembre (dilluns) — el tall
 
 L'ordre importa. Els passos 2.1 a 2.4 es fan **abans** de la primera execució amb dades de
 productiva, no després.
@@ -243,12 +246,12 @@ A `appsettings.Production.json` del servidor, al costat de l'executable —no a 
 màquina, perquè `AE02SAPRDP` allotja webservices de tercers que les llegirien:
 
 ```
-ServiceLayer:CompanyDb  ->  DB_FARINERA_PROD
+ServiceLayer:CompanyDb  ->  DB_FARINERA
 ```
 
-⚠️ **`DB_FARINERA_PROD` és un nom que aquest runbook dona per fet, i no existeix.** El 22/09/2026, a
+⚠️ **Aquest quadre deia `DB_FARINERA_PROD` fins al 14/10/2026, i aquest nom no existeix.** El 22/09/2026, a
 `AE01SAPSQL` hi havia `DB_FARIN_TEST` (test), `SBO-COMMON`, `DB_FARINERA_TEST` (OFFLINE) i
-**`DB_FARINERA`** — cap `DB_FARINERA_PROD`. Posar-hi el nom d'aquest quadre faria petar el Worker amb
+**`DB_FARINERA`** — cap `DB_FARINERA_PROD`. Posar-hi aquell nom faria petar el Worker amb
 `Invalid login credential`, un missatge que apunta a la contrasenya i no al nom.
 
 ✅ **El 06/10/2026 la sonda va fer `Login` a `DB_FARINERA` correctament amb `proceso`**, o sigui que la
@@ -258,7 +261,7 @@ productiva, però el nom a posar-hi és aquest i no l'altre.
 🔴 **I el mateix dia es va trobar el que bloqueja de debò: `proceso` NO té autoritzacions de lectura a
 la companyia productiva** — `BusinessPartners` respon `403` / `-3000`, *The logged-on user does not have
 permission to use this object*. Les autoritzacions de SAP B1 són **per usuari i per companyia**, i les
-de test no diuen res de les de producció. **Això s'ha de resoldre abans del dia 2, i es verifica
+de test no diuen res de les de producció. **Això s'ha de resoldre abans del dia 16, i es verifica
 tornant a llançar la sonda** (veure `docs/memoria_projecte.md`, §*`proceso` NO té permisos a la
 companyia productiva*).
 
@@ -271,7 +274,7 @@ precisament perquè ningú el canviés pensant que era l'interruptor.
 toca, i no s'ha de buidar (veure 2.1b). Des del 29/09/2026 el número surt del prefix `NNN-` del nom de
 l'adreça de SAP, i `etl.sp_assign_client_ship_no` aplica la mateixa regla a les adreces noves.
 
-**Conseqüència per al dia 2:** les adreces que a la companyia de test no hi són i a la productiva sí
+**Conseqüència per al dia 16:** les adreces que a la companyia de test no hi són i a la productiva sí
 —§6.6 de la memòria: 45 dels 63 locations perduts— arribaran com a adreces noves i **agafaran el seu
 número de KAIS automàticament**, no un `MAX+1` inventat. Això no vol cap pas manual, però sí una
 comprovació: després del primer run contra la productiva, mirar
@@ -292,7 +295,7 @@ ple de dades de test.
 DELETE FROM IntercanviSAP.sap_raw.sync_state;
 
 -- Les taules de documents. El Worker només esborra els DocEntry del lot que
--- baixa, i DB_FARINERA_PROD no retornarà mai els DocEntry de test: les 47
+-- baixa, i DB_FARINERA no retornarà mai els DocEntry de test: les 47
 -- capçaleres i 62 línies inventades es quedarien barrejades amb les de
 -- productiva i arribarien a Analitza.
 TRUNCATE TABLE IntercanviSAP.sap_raw.DLN1;  TRUNCATE TABLE IntercanviSAP.sap_raw.ODLN;
@@ -332,14 +335,17 @@ documental»*.
 El que sí que es migra: mestres, **stock inicial** valorat i amb lots, i les **factures pendents de
 cobrament** com a factures de servei sense efecte fiscal, amb el número, la data, l'import i el
 venciment originals de KAIS. Aquelles són `OINV` obertes i entraran a `est_cobraments` amb data
-anterior al tall, que és el que evita que el deute dels clients sembli haver desaparegut el dia 2.
+anterior al tall, que és el que evita que el deute dels clients sembli haver desaparegut el dia 16.
 
 Dos fets operatius que se'n deriven i que val la pena tenir presents:
 
 - **Els albarans pendents de facturar es puntegen i es facturen tots a KAIS abans del tall**, perquè
   l'stock quedi quadrat a l'entorn antic. O sigui que no arriben albarans a mig facturar a SAP.
-- **KAIS es manté viu com a plataforma de consulta.** És el que fa possible la càrrega puntual del
-  desembre per corregir el cost d'octubre: la base de dades antiga hi serà.
+- **KAIS es manté viu com a plataforma de consulta.** És el que fa possible la càrrega puntual que
+  corregirà el cost d'octubre i de l'1-15 de novembre (no abans del gener, quan tanca el novembre): la
+  base de dades antiga hi serà. L'Adrià la farà amb una càrrega de KAIS i **immediatament una de SAP
+  amb data mínima el 16/11** — si la de SAP anés amb la finestra de 90 dies, esborraria el KAIS que
+  s'acaba de carregar (preguntat a `resposta_adria_7`).
 
 ### 2.4 El `discount` — i el `/100`, que ja està resolt
 
@@ -377,9 +383,9 @@ canvi es converteix en FULL tot sol; i l'incremental en règim estable no dona l
 
 Del `/100` només queda la vigilància: KAIS li guardava els preus en cèntims i les seves SQL feien
 `product_price/100` i `product_cost/100` sense dividir `net_amount`. **El 05/10/2026 confirma que el
-treu**, i nosaltres emetem euros. Però si el dia 2 se li oblidés, els preus li quedarien 100× petits,
+treu**, i nosaltres emetem euros. Però si el dia 16 se li oblidés, els preus li quedarien 100× petits,
 el `net_amount` quadraria igual i **cap validació nostra ho detectaria**: no es veu des d'aquí, es veu
-mirant una línia de la seva banda. Val la pena preguntar-l'hi el dia 3.
+mirant una línia de la seva banda. Val la pena preguntar-l'hi el dia 17.
 
 Un cop fets 2.1–2.4, actualitzar `.claude/rules/04-contracte-analitza.md` i
 `docs/memoria_projecte.md`, que documenten la convenció del multiplicador com si fos l'única.
@@ -424,7 +430,7 @@ EXEC IntercanviSAP.etl.sp_run_all;   -- de debo, amb swap
 
 ---
 
-## 3 de novembre — el pas que s'oblida
+## 17 de novembre — el pas que s'oblida
 
 ```sql
 UPDATE IntercanviSAP.cfg.settings SET [value] = '10' WHERE [key] = 'ID_DROP_MAX';

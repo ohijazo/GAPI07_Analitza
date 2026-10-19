@@ -3,7 +3,7 @@
 > Visió executiva completa: què és, com funciona, què s'ha decidit i per què, què s'ha
 > trobat pel camí i què queda obert.
 >
-> Última actualització: **05/10/2026**
+> Última actualització: **13/10/2026**
 
 ---
 
@@ -17,7 +17,8 @@ Aquest projecte substitueix aquell origen: extreu de SAP B1, transforma al forma
 proporcionava, i publica una base de dades intermèdia de només lectura que Analitza consulta amb
 **les mateixes consultes SQL que ja tenia**. Analitza no ha de canviar res.
 
-**Cutover a productiva: 2 de novembre de 2026.** És un **tall sec**: aquell dia es comença a
+**Cutover a productiva: 16 de novembre de 2026** (es va moure del 2 al 16; comunicat a Analitza el
+13/10/2026). És un **tall sec**: aquell dia es comença a
 treballar amb SAP i a KAIS ja no hi entren dades. No hi haurà cap període amb els dos ERPs rebent
 les mateixes operacions, així que **una comparació KAIS contra SAP no serà possible mai**, ni abans
 ni després. Tot el que es pugui validar abans, s'ha de validar sobre estructura i mestres.
@@ -451,6 +452,28 @@ un cost que va derivant no es detectaria mai i corrompria les seves conclusions.
 2. Acceptar `GrossBuyPrice` com a aproximació, **dient-ho per escrit** perquè ells sàpiguen què
    estan mirant.
 3. Deixar-lo buit — només si ells confirmen que ja no el fan servir.
+
+#### ❌ Corregit el 14/10/2026: `GrossBuyPrice` NO és el preu actual de l'article — es guarda a la línia
+
+La conclusió de dalt («és el preu de compra **actual** de l'article; s'ha de congelar») era falsa, i
+s'havia arribat a dir a l'Adrià (`resposta_adria_6`). Es va mesurar amb `--raw` contra `DB_FARIN_TEST`
+(99 albarans + 10 devolucions, tot llegit en el mateix moment): **el mateix article té valors diferents
+segons el document** — `30350` val `2.0` fins al 09/09 i `0.00007` des de l'11/09; `33010` val `33.0`,
+`0.7636` i `10.03`. Si fos un valor de l'article, seria igual a totes les línies.
+
+O sigui: és el **preu base del benefici brut de la línia** (`DLN1.GrossBuyPr`), guardat quan es crea el
+document. Totes les línies porten `GrossBase = -1` (l'origen del preu base, que mana la configuració de
+documents de SAP). Conseqüències:
+
+- **La congelació a `sp_load_invoice_lines` no cal.** La reconstrucció setmanal llegeix el mateix valor.
+  Adoptar-lo és només `Sync:CostField = "GrossBuyPrice"`.
+- **Segueix sense ser `StockPrice`**: les discrepàncies de dalt (33,00 contra 32,6761, 10 contra 5) són
+  d'origen, no de temps. Hi ha línies a 0.
+- **Els valors de test no diuen res de la qualitat** (`0.00007 €` una farina). Si és bo o no, només es pot
+  veure a productiva.
+
+L'Adrià (14/10) hi està d'acord però prefereix un 0 a un marge erroni. **Decideix el Lluís**: aquest valor
+o 0. Contestat a `resposta_adria_7`.
 
 ### 6.3 `PriceBefDi` és `UnitPrice` o `Price` — ⚠️ NO CONCLOENT
 
@@ -993,6 +1016,116 @@ exactament on havia de notar-se la re-congelació del `ship_no`. El total de mod
 (5.088 → 5.249): la previsió de «l'ordre de 4.300» que es va escriure l'01/10 era optimista, i el que
 se l'emporta és la columna `email`, que no té res a veure amb aquesta feina. Els `phone_number` són
 format (`972.210.901` → `972210901`) i ja hi eren.
+
+### ⚠️ La data del tall es mou al 16 de novembre — `resposta_adria_6` enviat el 13/10/2026
+
+**El cutover passa de dilluns 2 a dilluns 16 de novembre de 2026.** Es manté l'estructura de la nit de
+relleu —KAIS fins diumenge 15, SAP des de dilluns 16—, així que el que l'Adrià preguntava l'01/09 (que
+no hi hagi cap dia amb insercions a les dues bases) segueix cobert. Comunicat a Analitza el 13/10/2026.
+
+> ✅ **`resposta_adria_6.docx` enviat el 13/10/2026**, **només a l'Adrià**. Tres punts: la data nova
+> —filtre a `date >= '2026-11-16'` i el seu swap de SQL el dia 16—, els mesos que es queden sense cost,
+> i el `GrossBuyPrice`.
+
+**El que el canvi de data arregla sol.** El cost del mes −2 torna a entrar a la seva càrrega al canvi de
+mes, o sigui que el setembre s'arreglava l'1 de novembre: amb el tall el dia 2 depenia d'una càrrega
+feta el dia abans, i amb el 16 hi ha dues setmanes per comprovar-ho. **El setembre deixa de ser un
+problema nostre.**
+
+**I una imprecisió que el canvi de data va destapar.** L'esborrany del 08/10 deia que «l'última càrrega
+abans del tall és l'última oportunitat» de deixar bé el cost del setembre i de l'octubre, i **no era
+exacte ni amb la data vella**: el cost de l'octubre no existeix a KAIS fins a l'1 de desembre, així que
+cap càrrega anterior al tall el podia portar. La via sempre va ser la càrrega puntual que l'Adrià va
+proposar l'01/09 («mirem al desembre de corregir-ho»), possible perquè KAIS queda viu per consulta.
+
+Amb el tall el 16, els mesos oberts queden així:
+
+| Mes | El cost li entra a KAIS | Amb el tall el 16/11 |
+|---|---|---|
+| Setembre 2026 | l'1 de novembre | ✅ entra sol, dues setmanes abans del tall |
+| Octubre 2026 | l'1 de desembre | ❌ càrrega puntual |
+| 1–15 de novembre | l'1 de gener | ❌ càrrega puntual, i **no abans del gener** |
+
+O sigui que **el desembre ja no n'hi ha prou**: o dues càrregues puntuals, o una de sola al gener amb
+data mínima l'1 d'octubre.
+
+**⚠️ El punt nou a vigilar, i és de la família silenciosa.** L'Adrià va dir l'01/09 que la seva càrrega
+«reemplaça a partir de la data mínima que li passem». Si la càrrega puntual del gener va amb data mínima
+`2026-10-01` i només porta KAIS —fins al 15 de novembre—, **els esborraria el mes i mig de dades de SAP
+del 16 endavant**. Des d'aquí no es veuria: `vanished_ids` compara `dbo` contra `staging`, no el que
+ells tinguin carregat. Preguntat al correu del 13/10; és seu i no ho podem comprovar nosaltres.
+
+**La pregunta del cost va reformulada.** Com que el correu va només a l'Adrià, ja no li demana al Lluís
+que decideixi: li demana a l'Adrià el que sí que és seu —ell ha vist `GrossBuyPrice` en altres clients i
+sap què hi fa la seva anàlisi de marges— si un preu de compra congelat val més que un zero o val menys
+perquè sembla un cost i no ho és. ⏳ **La decisió del Lluís segueix oberta i va per un altre camí**: no
+cal esperar l'Adrià per fer-la-hi, les dues respostes no depenen l'una de l'altra.
+
+✅ **Fet el 14/10/2026: data nova propagada** al runbook, `README.md`, `deploy/README.md`, la Regla 04 i tres comentaris de codi; de pas, `DB_FARINERA_PROD` → `DB_FARINERA` on encara hi era (runbook 2.1, README, `deploy/`). Les entrades amb data d'aquesta memòria i els correus enviats no s'han tocat. Text original:
+~~Pendent: propagar la data nova al repositori.~~ El `2 de novembre` surt a una vintena de llocs
+(`docs/runbook_cutover.md`, fins al títol i als passos; `README.md`; `.claude/rules/04`; aquesta
+memòria; `deploy/README.md`) i als correus ja enviats a l'Olga, a Sistemes i al Carles, que no es
+toquen. També mou la data límit del **27 d'octubre** demanada a Seidor per a les autoritzacions a la
+companyia productiva.
+
+### ⏳ L'Adrià contesta el 14/10/2026 — `resposta_adria_7` enviat
+
+> ✅ **`resposta_adria_7.docx` enviat** (confirmat el 15/10/2026), només a l'Adrià. Esperant-ne: què eren
+> les set sèries excloses de KAIS, i que la càrrega de SAP posterior a la de KAIS vagi amb data mínima
+> el 16/11. ⏳ **Pendent nostre:** la decisió del Lluís sobre el cost (`GrossBuyPrice` o 0), que s'ha
+> promès confirmar a l'Adrià abans del 16/11.
+
+- **Data:** anotada, el 16/11.
+- **Càrrega de correcció del cost:** farà una càrrega de KAIS i immediatament una de SAP. Resol el risc
+  de `resposta_adria_6`, però n'obre el simètric: si la de SAP va amb la finestra de 90 dies i
+  «reemplaça a partir de la data mínima», esborraria el KAIS de mitjan octubre al 15/11. Demanat que
+  vagi amb data mínima el 16/11.
+- **Cost:** ell trobava bé `GrossBuyPrice` congelat, però val més un 0 que un marge erroni. I en
+  mesurar-ho, resulta que **SAP ja el guarda a cada línia** (§6.2): no cal congelar res. Pendent el
+  Lluís: aquest valor o 0.
+- **Devolucions:** sí que hi són (`2xxxxxxxx`, `3xxxxxxxx`, en negatiu). No s'havia dit mai.
+- **Sèries:** la seva SQL exclou `series not in ('06','11','16','27','36','46','18')`, codis de KAIS. A
+  test, SAP publica `66` (albarans), `67` (devolucions) i `65` (abonaments): el filtre no exclou res.
+  Preguntat què eren. ⚠️ A productiva hi pot haver més sèries, i una `306` es publicaria com a `06` i es
+  descartaria en silenci (`RIGHT('00' + Series, 2)`).
+
+### ⏳ L'Adrià contesta el 15/10/2026 — el cost acceptat, i què eren les set sèries
+
+- **Càrrega KAIS + SAP:** «ja ho tenim contemplat» (la de SAP amb data mínima el 16/11).
+- **Cost:** accepta `GrossBuyPrice` guardat a la línia: canvia el significat, però «des del dia 0 ja
+  sabeu el marge», i un altre client seu (Sarrats) ja hi treballa. Per part d'Analitza està tancat;
+  ⏳ **falta el sí del Lluís** per canviar `Sync:CostField`.
+- **Les set sèries excloses**, segons ell perquè «aportaven soroll i el departament comercial no les
+  volia veure»:
+
+| Codi KAIS | Què era |
+|---|---|
+| `06` | albarans de magatzems |
+| `11` | albarans de magatzems |
+| `16` | dipòsit Vilassar |
+| `27` | dipòsit Vic |
+| `36` | dipòsit Salzadella |
+| `46` | dipòsit Mallorca |
+| `18` | ràpels |
+
+  «Si ha canviat la codificació, s'hauria d'actualitzar per mantenir-les excloses.»
+
+**El problema: a SAP no sabem com es distingiran aquests documents.** A `DB_FARIN_TEST` hi ha un sol
+magatzem (`01`), una sola sèrie per tipus de document (albarans `266`, devolucions `267`, abonaments
+`265`) i cap ràpel. Tal com publiquem avui (`RIGHT('00' + Series, 2)`), **cap d'aquests documents
+quedaria exclòs** a la productiva, i Analitza veuria el soroll que comercial no volia veure, sense que
+salti res. Hi ha tres maneres possibles, i qui ho sap és el Lluís / SEIDOR, no les dades de test:
+
+1. **Sèrie de SAP pròpia** per a cada cas → una taula `cfg` que tradueixi la sèrie de SAP al codi
+   de KAIS (`06`, `16`…). El filtre d'Analitza no canvia, i de pas desapareix la col·lisió `306` → `06`.
+2. **El magatzem de la línia** (`WarehouseCode`) → cal afegir-lo al mirall (`sap_raw.DLN1` no el
+   guarda) i fer la mateixa traducció per magatzem. No és cap entitat nova: és un camp de
+   `DocumentLines`.
+3. **Ràpels:** si SAP els fa com a abonaments de servei (sense article), ja queden fora pel filtre
+   `ItemCode NOT NULL`. Si porten article, cal una sèrie o una marca.
+
+Els dipòsits poden ser, a més, **transferències d'estoc** (`StockTransfers`) en comptes d'albarans: en
+aquest cas no els llegim i ja queden fora sols.
 
 ### L'scrubbing de la companyia de test, i per què no s'ha de tapar (05/10/2026)
 
@@ -2057,7 +2190,7 @@ de quin històric es comptarà? Disposaran d'una base de dades de test?
 > I la convenció de la casa és el prefix `U_FC` (els UDFs existents fan servir `U_SEI`, del
 > partner Seidor).
 
-**Bloc E — Cutover, 2 de novembre de 2026.** Tall sec: KAIS deixa de rebre dades el mateix dia que
+**Bloc E — Cutover, 16 de novembre de 2026** (era el 2; mogut el 13/10/2026). Tall sec: KAIS deixa de rebre dades el mateix dia que
 SAP arrenca.
 
 > Els passos concrets del dia, amb ordre, comprovacions i rollback, són a
@@ -2295,7 +2428,7 @@ Ara són quatre llocs, i si se'n salta un el camp arriba buit sense error:
 P:\GAPI07_Analitza├── CLAUDE.md + .claude
 ules\      Regles del projecte (5)
 ├── docs│   ├── memoria_projecte.md         Aquest fitxer
-│   ├── runbook_cutover.md          Els passos de l'1 i el 2 de novembre
+│   ├── runbook_cutover.md          Els passos del 15 i el 16 de novembre
 │   ├── correus_adria_2025-05-12.md Els correus de l'Adrià, transcrits dels PDF
 │   ├── Guia de importación de datos Analitza CM v9.pdf
 │   └── Integracio_GAPI07.pdf

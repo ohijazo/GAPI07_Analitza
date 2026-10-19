@@ -73,7 +73,7 @@ public sealed class SyncOptions
     /// sortida del pipeline apuntat a SAP, i per tant ja porta CardCodes.
     /// La sonda la fa servir per dir quins clients d'Analitza es perdrien.
     /// Cal tornar-la a demanar just abans del tall: els clients donats d'alta
-    /// entre l'exportacio i el 2 de novembre no hi son.
+    /// entre l'exportacio i el 16 de novembre no hi son.
     /// </summary>
     public string KaisClientExportPath { get; set; } = string.Empty;
 }

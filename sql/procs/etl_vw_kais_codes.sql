@@ -7,7 +7,7 @@
    PER QUE EXISTEIXEN
    ------------------
    Analitza construeix el seu historic sobre els identificadors que li arribaven
-   de KAIS. Al cutover del 2 de novembre de 2026 l'origen passa a ser SAP i, on
+   de KAIS. Al cutover del 16 de novembre de 2026 l'origen passa a ser SAP i, on
    el codi no coincideixi, l'historic deixa de lligar: Analitza no veu un error,
    veu un client que ha deixat de comprar i un altre que acaba de neixer
    (Regla 04).

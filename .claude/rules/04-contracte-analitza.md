@@ -53,8 +53,9 @@ el que els donava KAIS. **Les 8 taules `est_*` són un contracte, no un detall d
   igual i cap validació nostra ho detectaria. **No multiplicar per 100 al nostre costat**, ni
   "per si de cas": les dues correccions alhora tornarien a desquadrar-ho.
 
-  Del mateix correu: **ell carrega només línies amb `date >= '2026-11-02'`**, així que res del que
-  publiquem abans del tall li arriba. I **no diu res del `discount`**, o sigui que manté el seu
+  Del mateix correu: **ell carrega només línies amb `date >= '2026-11-16'`**, així que res del que
+  publiquem abans del tall li arriba (el correu deia el 02/11; el tall es va moure al 16 i ell ho té
+  anotat des del 14/10/2026). I **no diu res del `discount`**, o sigui que manté el seu
   `1 - discount` i la convenció del multiplicador es queda com està (`DISCOUNT_AS_PERCENT = '0'`).
 - **Els imports negatius** de devolucions i abonaments porten `quantity` negativa també. La guia
   d'Analitza ho exigeix i `sp_data_quality_checks` ho verifica.

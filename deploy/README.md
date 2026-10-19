@@ -226,7 +226,7 @@ demana les contrasenyes interactivament, així no viatgen per cap canal.
 \\tomatera\Farinera\ohijazo\GAPI07_Analitza\deploy\Set-ProductionConfig.ps1 -SqlServer 192.168.11.238
 
 # Només canviar la companyia, sense tocar les contrasenyes (p. ex. al cutover)
-\\tomatera\Farinera\ohijazo\GAPI07_Analitza\deploy\Set-ProductionConfig.ps1 -FixCompanyDb DB_FARINERA_PROD
+\\tomatera\Farinera\ohijazo\GAPI07_Analitza\deploy\Set-ProductionConfig.ps1 -FixCompanyDb DB_FARINERA
 ```
 
 Fa tres coses que fer-ho a mà no fa: construeix la cadena de SQL amb `SqlConnectionStringBuilder`
@@ -430,9 +430,10 @@ FROM   IntercanviSAP.audit.etl_runs ORDER BY run_id DESC;
 
 ---
 
-## Al cutover (2 de novembre)
+## Al cutover (16 de novembre)
 
-Canviar `CompanyDb` a `DB_FARINERA_PROD` a l'`appsettings.Production.json` del servidor. No cal
+Canviar `CompanyDb` a `DB_FARINERA` (no `DB_FARINERA_PROD`, que no existeix; pendent que un consultor
+confirmi que `DB_FARINERA` és la productiva, veure el pas 2.1 del runbook) a l'`appsettings.Production.json` del servidor. No cal
 reiniciar res: la tasca el rellegeix a cada execució.
 
 ⚠️ **I buidar el checkpoint i les taules de documents del mirall**, que no és opcional:

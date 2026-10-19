@@ -12,7 +12,7 @@
 
     Us:
         powershell -ExecutionPolicy Bypass -File Check-WorkerHost.ps1
-        powershell -ExecutionPolicy Bypass -File Check-WorkerHost.ps1 -ExpectedCompanyDb DB_FARINERA_PROD
+        powershell -ExecutionPolicy Bypass -File Check-WorkerHost.ps1 -ExpectedCompanyDb DB_FARINERA
 
     Per que existeix: el 24/09/2026 el job de les 03:00 va avortar dues nits
     seguides amb ABORTED_STALE_MIRROR i no hi havia manera de saber des de fora
